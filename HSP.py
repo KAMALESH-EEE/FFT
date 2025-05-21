@@ -28,8 +28,14 @@ def REC (a,MAT):
         return
     temp = MAT[:]
     l,b = temp.pop(0)
-    REC ((L+l , B+b),temp)
-    REC ((L+b , B+l),temp)
+    t = B if(B>b) else b
+    REC ((L+l , t),temp)
+    t = L if(L>l) else l
+    REC ((t , B+b),temp)
+    t = B if(B>l) else l
+    REC ((L+b , t),temp)
+    t = L if(L>b) else b
+    REC ((t , B+l),temp)
 
 REC((0,0),Mini_HS)
 
