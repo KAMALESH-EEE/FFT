@@ -20,6 +20,7 @@ N = len(IQ)
 IQ_fft = np.fft.fftshift(np.fft.fft(IQ, n=N))  # Shift zero freq to center
 f = np.fft.fftshift(np.fft.fftfreq(N, d=1/Fs))  # Frequency axis
 
+np.fft.fftshift()
 # Magnitude in dB
 magnitude_dB = 20 * np.log10(np.abs(IQ_fft) + 1e-12)  # add small value to avoid log(0)
 
