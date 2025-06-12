@@ -1,35 +1,36 @@
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import math
 
-# Load your actual I/Q data from CSV
-df = pd.read_csv('your_iq_data.csv')  # Replace with your filename
+i=[t for t in range(100000)]
+q=[math.sin(t) for t in range(100000)]
 
-# Extract I and Q columns
-I = df['I'].values
-Q = df['Q'].values
+# Simulated example
+# Replace with your actual ADC IQ data
+I = np.array(q)  # In-phase samples
+Q = np.array(q)  # Quadrature samples
 
-# Form complex signal
-IQ = I + 1j * Q
 
-# Sampling rate (Hz) — you MUST set this to your ADC's sampling rate
-Fs = 1e6  # Example: 1 MHz
+IQ = I 
 
 # Perform FFT
 N = len(IQ)
-IQ_fft = np.fft.fftshift(np.fft.fft(IQ, n=N))  # Shift zero freq to center
-f = np.fft.fftshift(np.fft.fftfreq(N, d=1/Fs))  # Frequency axis
+fft_data = np.fft.fft(IQ, n=N)
+fft_shifted = np.fft.fftshift(fft_data)  # Shift zero freq to center
+magnitude = 20 * np.log10(np.abs(fft_data))  # dB scale
 
-np.fft.fftshift()
-# Magnitude in dB
-magnitude_dB = 20 * np.log10(np.abs(IQ_fft) + 1e-12)  # add small value to avoid log(0)
+# Frequency axis
+fs = 1e6  # Sampling rate (example: 1 MSps). Change as per your ADC.
+freq = (np.fft.fftfreq(N, d=1/fs))
+
+print(np.fft.fftfreq(N, d=1/fs))
 
 # Plot
 plt.figure(figsize=(10, 5))
-plt.plot(f / 1e6, magnitude_dB)  # Frequency in MHz
-plt.title('FFT Spectrum of I/Q Signal')
-plt.xlabel('Frequency (MHz)')
-plt.ylabel('Magnitude (dB)')
+plt.plot(freq / 1e6, magnitude)  # Convert Hz to MHz
+plt.title("Frequency Spectrum (FFT of IQ Data)")
+plt.xlabel("Frequency (MHz)")
+plt.ylabel("Magnitude (dB)")
 plt.grid(True)
 plt.tight_layout()
 plt.show()
