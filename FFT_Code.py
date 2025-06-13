@@ -1,6 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+import scipy
+
+print(scipy.__Name__)
+print(plt.__package__)
 
 i=[t for t in range(100000)]
 q=[math.sin(t) for t in range(100000)]
