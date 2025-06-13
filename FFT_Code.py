@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import math
 import scipy
 
-print(scipy.__Name__)
+print(scipy.__version__)
 print(plt.__package__)
 
 i=[t for t in range(100000)]
