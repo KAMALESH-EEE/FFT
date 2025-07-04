@@ -6,6 +6,31 @@ from time import sleep
 
 print('Libraries imported')
 
+
+#=================Software=========================
+#User Data
+
+User_Data = 'SDRTEAM'
+
+#Adding Header & Fooder
+
+Src = 'PRJ'
+Des = 'SYS'
+
+FULL_Data = Src + User_Data + Des
+
+print(FULL_Data)
+
+
+No_of_bits = len(FULL_Data) * 8
+
+print('No of Bits: ',No_of_bits)
+
+input() # hold the terminal
+
+#=================FPGA=========================
+
+
 # timing calculation:
 
 Data_Rate = 4.096e6
@@ -35,19 +60,23 @@ sin_LO = np.sin(k * Fnco * t) # sine wave
 cos_LO = np.cos(k * Fnco * t)
 
 ST = 0
-ED =8000
+ED = 100
 
+PF = False
 
-
-while PF and ED < No_of_Samples+802:
-    plt.plot(t[ST:ED],sin_LO[ST:ED])
-    plt.plot(t[ST:ED],cos_LO[ST:ED])
+while PF and ED < No_of_Samples:
+    plt.plot(t[ST:ED],sin_LO[ST:ED],)
+    #plt.plot(t[ST:ED],cos_LO[ST:ED])
     plt.grid()
-    plt.show()
-    #sleep(5)
-    ST = ST+8000
-    ED = ED+8000
-    break
+    plt.show(block = False)
+    
+    plt.pause (0.1)
+    plt.cla()
+
+    ST = ST + 50
+    ED = ED + 50
+    
+plt.close()
 
 
 #Printing Calculated Values:
@@ -59,17 +88,42 @@ print('No of Samples: ', No_of_Samples)
 
 
 
+print('Data from ADSP',FULL_Data)
 
-input() # hold the terminal
+#converting to Bit-Stream
+
+BIT_STREAM = ''
+
+for i in FULL_Data:
+    st = str(bin(ord(i)))[2::]
+    print (i,'->',st)
+    BIT_STREAM += st
+    
+print('BIT STREAM',BIT_STREAM)
+
+# Encoding (LDPC)
+
+Code_Rate = 3/4
+
+D_L = len(BIT_STREAM)
 
 
-#User Data
 
-Data = 'HELLOSDR'
 
-No_of_bits = len(Data) * 8
 
-print('No of Bits: ',No_of_bits)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Modulation:
 
@@ -81,3 +135,41 @@ print (Sample_Rate / Symbol_Rate)
 
 
 
+
+
+
+
+
+
+
+def LDPC_ENCODE(data,CodeRate):
+    DL = len (data)
+    CL = DL // CodeRate
+    print(CL)
+    DF = CL - DL
+    DF = int (DL // DF )
+    print(DF)
+    st = ''
+    for i in range(0,DL,DF):
+        st += data[i:i+DF]
+        st += '0'
+    print(st)
+    LDPC_DECODE(st,CodeRate)
+    
+def LDPC_DECODE(data,CodeRate):
+    CL = len (data)
+    DL = (CL * CodeRate) // 1
+    print(CL)
+    DF = CL - DL
+    DF = int (DL // DF )
+    print(DF)
+    st = ''
+    for i in range(CL-1,-1,-1*DF):
+        try:
+            st = st[:i]+st[i+1:]
+        except :
+            st = st[:i]
+    print(st)
+    
+  
+LDPC_ENCODE('1111111',3/4)
