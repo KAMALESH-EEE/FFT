@@ -24,8 +24,8 @@ print(Rb)
 
 RF = 0.35
 BW = Rb * (1.35)
-Vi = 13
-print(BW*0.8)
+Vi = 20
+print(BW*0.9)
 
 
 
@@ -50,6 +50,7 @@ Tend = Vi
 plt.stem(_I[:Tend],label = 'I data')
 #plt.stem(_Q[:Tend],label = 'Q data')
 plt.legend()
+plt.title('RAW DATA')
 plt.show()
 
 
@@ -72,6 +73,7 @@ Q = np.array(Q)
 plt.stem(n[:Tend],I[:Tend],label = 'I data')
 plt.stem(n[:Tend],Q[:Tend],label = 'Q data')
 plt.legend()
+plt.title('UPSAMPLED')
 plt.show()
 
 
@@ -91,6 +93,7 @@ def rrc_filter(alpha, span, sps):
 h = rrc_filter(0.35,6,3)
 
 plt.plot(h)
+plt.title('Impulse Response of RRC Filter')
 plt.grid()
 plt.show()
 
@@ -105,6 +108,8 @@ up_Q = np.convolve(Q, h, mode='same')
 plt.plot(n[:Tend],up_I[:Tend],label = 'I data')
 plt.plot(n[:Tend],up_Q[:Tend],label = 'Q data')
 plt.legend()
+
+plt.title('Pulse Shape after RRC Filter')
 plt.grid()
 plt.show()
 
@@ -130,6 +135,7 @@ Tend = Vi * 3 *Interpolation
 plt.plot(ip_I[:Tend],label = 'I data')
 plt.plot(ip_Q[:Tend],label = 'Q data')
 plt.legend()
+plt.title('Interpolation Output')
 plt.grid()
 plt.show()
 
@@ -140,6 +146,7 @@ DAC_Q = lfilter(lpf, 1.0, ip_Q)
 plt.plot(n[:Tend], DAC_I[:Tend],label = 'I data')
 plt.plot(n[:Tend], DAC_Q[:Tend],label = 'Q data')
 plt.legend()
+plt.title('After Low-Pass Filter')
 plt.grid()
 plt.show()
 
@@ -174,6 +181,7 @@ Sig_Q = DAC_upQ * np.sin(2 * np.pi * Fc * tfc)
 plt.plot(Sig_I[:Tend],label = 'I data')
 plt.plot(Sig_Q[:Tend],label = 'Q data')
 plt.legend()
+plt.title('Interpolation in DAC')
 plt.grid()
 plt.show()
 
@@ -189,5 +197,6 @@ DAC_OUT = Sig_I - Sig_Q
 
 plt.plot(tfc[:Tend],DAC_OUT[:Tend],label = 'DAC data')
 plt.legend()
+plt.title('Final DAC Output')
 plt.grid()
 plt.show()
