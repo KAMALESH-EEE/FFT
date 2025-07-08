@@ -2,12 +2,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import upfirdn,lfilter,firwin
 
+
+
 sps = 3
 Rs = 6.144E6 # Sampling rate
 Rd = 4.096E6  # Data rate
 Rb = Rd/2 # In QPSK Symbol rate = Data rate / 2
-T = int(input('Enter time mSec: '))
+T = int(input('Enter time mSec: ')) * 0.8
 T /= 1000
+
+
 N = int(T*Rb*sps) #No_of_Samples
 Nb = int(T*Rd) #No_of_bits
 n = [i for i in range(N)]
@@ -16,17 +20,22 @@ t = np.array(n)/Rs
 print(Rb)
 
 
+
+
 RF = 0.35
 BW = Rb * (1.35)
-print(BW)
+Vi = 13
+print(BW*0.8)
 
 
-st = '1010011101010101'
+
+
+st = '100101011101010101'
 GrayMap = {'00':(1,-1),'01':(1,1),'10':(-1,1),'11':(-1,-1)}
 s = ['0' for i in range(Nb-len(st))]
 s = ''.join(s)
 st +=s
-st = '000000'+st
+st = '00'+st
 _I = []
 _Q = []
 
@@ -36,8 +45,10 @@ while (i<len(st)):
   _I.append(_i)
   _Q.append(_q)
   i+=2
-plt.stem(_I[3:13],label = 'I data')
-#plt.stem(_Q[3:13],label = 'Q data')
+
+Tend = Vi
+plt.stem(_I[:Tend],label = 'I data')
+#plt.stem(_Q[:Tend],label = 'Q data')
 plt.legend()
 plt.show()
 
@@ -45,10 +56,12 @@ plt.show()
 
 
 #upsampling
-I = [0 for i in range(N)]
-Q = [0 for i in range(N)]
+I = [0 for i in range(len(_I)*3)]
+Q = [0 for i in range(len(_Q)*3)]
+Tend = Vi * 3
 i=0
 s = 1
+print(len(I),len(_I))
 for j in range(0,len(I),3):
   I[j+s] = _I[i]
   Q[j+s] = _Q[i]
@@ -56,10 +69,13 @@ for j in range(0,len(I),3):
 del(i)
 I = np.array(I)
 Q = np.array(Q)
-plt.stem(n[0:60],I[0:60],label = 'I data')
-#plt.stem(n[9:39],Q[9:39],label = 'Q data')
+plt.stem(n[:Tend],I[:Tend],label = 'I data')
+plt.stem(n[:Tend],Q[:Tend],label = 'Q data')
 plt.legend()
 plt.show()
+
+
+
 
 
 def rrc_filter(alpha, span, sps):
@@ -75,6 +91,7 @@ def rrc_filter(alpha, span, sps):
 h = rrc_filter(0.35,6,3)
 
 plt.plot(h)
+plt.grid()
 plt.show()
 
 
@@ -85,10 +102,12 @@ plt.show()
 up_I = np.convolve(I, h, mode='same')
 up_Q = np.convolve(Q, h, mode='same')
 
-plt.stem(n[0:60],up_I[0:60],label = 'I data')
-#plt.stem(n[9:39],up_Q[9:39],label = 'Q data')
+plt.plot(n[:Tend],up_I[:Tend],label = 'I data')
+plt.plot(n[:Tend],up_Q[:Tend],label = 'Q data')
 plt.legend()
+plt.grid()
 plt.show()
+
 
 
 Interpolation  = 30
@@ -99,19 +118,76 @@ print(Sampling_rate)
 cutoff = Rs / 2  # 3.072 MHz cutoff
 num_taps = 121
 lpf = firwin(num_taps, cutoff / (Sampling_rate / 2), window='hamming')
+
+
+
+
 ip_I = upfirdn([1],up_I,up = Interpolation)
 ip_Q = upfirdn([1],up_Q,up = Interpolation)
 
-plt.plot(n[0:1800],ip_I[0:1800],label = 'I data')
-#plt.stem(n[9:39],ip_Q[9:39],label = 'Q data')
+Tend = Vi * 3 *Interpolation
+
+plt.plot(ip_I[:Tend],label = 'I data')
+plt.plot(ip_Q[:Tend],label = 'Q data')
 plt.legend()
+plt.grid()
 plt.show()
 
 # === Apply Filter ===
 DAC_I = lfilter(lpf, 1.0, ip_I)
 DAC_Q = lfilter(lpf, 1.0, ip_Q)
 
-plt.plot(n[0:1800],DAC_I[0:1800],label = 'I data')
-#plt.stem(n[9:39],DAC_I[9:39],label = 'Q data')
+plt.plot(n[:Tend], DAC_I[:Tend],label = 'I data')
+plt.plot(n[:Tend], DAC_Q[:Tend],label = 'Q data')
 plt.legend()
+plt.grid()
+plt.show()
+
+
+
+# Modulation
+
+DAC_Rd = 5E9
+vi =Vi * 3 * Interpolation
+Interpolation = DAC_Rd / Sampling_rate
+print(Interpolation)
+Tend = int(vi * Interpolation)
+
+
+lpf = firwin(num_taps, (Sampling_rate / 2) / (DAC_Rd / 2), window='hamming')
+
+
+DAC_upI = upfirdn([1],DAC_I,up = Interpolation)
+DAC_upQ = upfirdn([1],DAC_Q,up = Interpolation)
+
+
+DAC_upI = lfilter(lpf, 1.0, DAC_upI)
+DAC_upQ = lfilter(lpf, 1.0, DAC_upQ)
+
+tfc = np.arange(len(DAC_upI)) / DAC_Rd
+
+Fc = 3E6
+
+Sig_I = DAC_upI * np.cos(2 * np.pi * Fc * tfc)
+Sig_Q = DAC_upQ * np.sin(2 * np.pi * Fc * tfc)
+
+plt.plot(Sig_I[:Tend],label = 'I data')
+plt.plot(Sig_Q[:Tend],label = 'Q data')
+plt.legend()
+plt.grid()
+plt.show()
+
+
+
+DAC_GAIN = 0
+Sig_I = Sig_I * (2**DAC_GAIN)
+Sig_Q = Sig_Q * (2**DAC_GAIN)
+
+
+DAC_OUT = Sig_I - Sig_Q
+
+
+plt.plot(tfc[:Tend],DAC_OUT[:Tend],label = 'DAC data')
+plt.legend()
+plt.grid()
 plt.show()
