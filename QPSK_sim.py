@@ -17,7 +17,7 @@ Nb = int(T*Rd) #No_of_bits
 n = [i for i in range(N)]
 t = np.array(n)/Rs
 
-print(Rb)
+print('Symbol Rate: ',Rb)
 
 
 
@@ -25,7 +25,7 @@ print(Rb)
 RF = 0.35
 BW = Rb * (1.35)
 Vi = 20
-print(BW*0.9)
+print('Occupaid Band width: ',BW*0.9)
 
 
 
@@ -47,12 +47,14 @@ while (i<len(st)):
   i+=2
 
 Tend = Vi
-plt.stem(_I[:Tend],label = 'I data')
+plt.cla()
+plt.stem(_I[:Tend],label = 'I Data')
 #plt.stem(_Q[:Tend],label = 'Q data')
 plt.legend()
 plt.title('RAW DATA')
-plt.show()
+plt.show(block = False)
 
+input()
 
 
 
@@ -62,7 +64,8 @@ Q = [0 for i in range(len(_Q)*3)]
 Tend = Vi * 3
 i=0
 s = 1
-print(len(I),len(_I))
+
+
 for j in range(0,len(I),3):
   I[j+s] = _I[i]
   Q[j+s] = _Q[i]
@@ -70,11 +73,14 @@ for j in range(0,len(I),3):
 del(i)
 I = np.array(I)
 Q = np.array(Q)
+plt.cla()
 plt.stem(n[:Tend],I[:Tend],label = 'I data')
-plt.stem(n[:Tend],Q[:Tend],label = 'Q data')
+#plt.stem(n[:Tend],Q[:Tend],label = 'Q data')
 plt.legend()
 plt.title('UPSAMPLED')
-plt.show()
+plt.show(block = False)
+
+input()
 
 
 
@@ -92,10 +98,13 @@ def rrc_filter(alpha, span, sps):
 
 h = rrc_filter(0.35,6,3)
 
+plt.cla()
 plt.plot(h)
 plt.title('Impulse Response of RRC Filter')
 plt.grid()
-plt.show()
+plt.show(block = False)
+
+input()
 
 
 
@@ -105,19 +114,22 @@ plt.show()
 up_I = np.convolve(I, h, mode='same')
 up_Q = np.convolve(Q, h, mode='same')
 
+plt.cla()
 plt.plot(n[:Tend],up_I[:Tend],label = 'I data')
 plt.plot(n[:Tend],up_Q[:Tend],label = 'Q data')
 plt.legend()
 
 plt.title('Pulse Shape after RRC Filter')
 plt.grid()
-plt.show()
+plt.show(block = False)
+
+input()
 
 
 
 Interpolation  = 30
 Sampling_rate = Rs * Interpolation
-print(Sampling_rate)
+print('Sampling Rate: ',Sampling_rate)
 
 # === FIR Low-pass Filter Design (Anti-Imaging) ===
 cutoff = Rs / 2  # 3.072 MHz cutoff
@@ -132,23 +144,26 @@ ip_Q = upfirdn([1],up_Q,up = Interpolation)
 
 Tend = Vi * 3 *Interpolation
 
-plt.plot(ip_I[:Tend],label = 'I data')
+'''plt.plot(ip_I[:Tend],label = 'I data')
 plt.plot(ip_Q[:Tend],label = 'Q data')
 plt.legend()
 plt.title('Interpolation Output')
 plt.grid()
-plt.show()
+plt.show()'''
 
 # === Apply Filter ===
 DAC_I = lfilter(lpf, 1.0, ip_I)
 DAC_Q = lfilter(lpf, 1.0, ip_Q)
 
+plt.cla()
 plt.plot(n[:Tend], DAC_I[:Tend],label = 'I data')
 plt.plot(n[:Tend], DAC_Q[:Tend],label = 'Q data')
 plt.legend()
-plt.title('After Low-Pass Filter')
+plt.title('Interpolation and Low-Pass Filter')
 plt.grid()
-plt.show()
+plt.show(block = False)
+
+input()
 
 
 
@@ -157,7 +172,7 @@ plt.show()
 DAC_Rd = 5E9
 vi =Vi * 3 * Interpolation
 Interpolation = DAC_Rd / Sampling_rate
-print(Interpolation)
+print('DAC interpolation: ',Interpolation)
 Tend = int(vi * Interpolation)
 
 
@@ -178,13 +193,16 @@ Fc = 3E6
 Sig_I = DAC_upI * np.cos(2 * np.pi * Fc * tfc)
 Sig_Q = DAC_upQ * np.sin(2 * np.pi * Fc * tfc)
 
+plt.cla()
 plt.plot(Sig_I[:Tend],label = 'I data')
 plt.plot(Sig_Q[:Tend],label = 'Q data')
 plt.legend()
 plt.title('Interpolation in DAC')
 plt.grid()
-plt.show()
 
+plt.show(block = False)
+
+input()
 
 
 DAC_GAIN = 0
@@ -194,9 +212,11 @@ Sig_Q = Sig_Q * (2**DAC_GAIN)
 
 DAC_OUT = Sig_I - Sig_Q
 
-
+plt.cla()
 plt.plot(tfc[:Tend],DAC_OUT[:Tend],label = 'DAC data')
 plt.legend()
 plt.title('Final DAC Output')
 plt.grid()
-plt.show()
+plt.show(block = False)
+
+input()
