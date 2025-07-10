@@ -4,6 +4,124 @@ from scipy.signal import upfirdn,lfilter,firwin
 
 
 
+#Software
+
+USER_DATA = 'SDR_TEAM'
+
+
+KEY = 5
+
+def Encypt(Data,Key):
+    En_Data = ''
+    for i in Data:
+        En_Data += (chr(ord(i)+Key))
+    return En_Data
+    
+def Decypt(Data,Key):
+    De_Data = ''
+    for i in Data:
+        De_Data += (chr(ord(i)-Key))
+    return De_Data
+    
+    
+def Find_CheckSum(Data):
+    cs = 0
+    for i in Data:
+        cs+=ord(i)
+    return cs
+    
+
+    
+Data = Encypt(USER_DATA,KEY)
+print(Data)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#FPGA Modules
+
+
+def generate_BitStream (DATA):
+    BS = ''
+    for i in DATA:
+        B=str(bin(ord(i))[2:])
+        if len(B) < 8:
+            for i in range(8 - len(B)):
+                B = '0'+B
+        BS+=B
+    return BS
+    
+def Data_BitStream (BS):
+    j=0
+    DATA = ''
+    print(len(BS))
+    for i in range(8,len(BS)+1,8):
+        Char = BS[j:i]
+        DATA+= chr(int(Char,2))
+        j=i
+    return DATA
+    
+    
+#print(Data_BitStream (generate_BitStream ('dA::9)::')))
+
+def Interleaver (Data,n,m):
+    size = n*m
+    if len(Data) > size:
+        Data = Data[:size]
+        
+    elif len(Data) < size:
+        
+        for i in range(size - len(Data)):
+            Data += '1'
+    A = ''
+    
+    for i in range (n):
+        st = ''
+        for j in range (i,size,n):
+            
+            st+=Data[j]
+        print(st)
+        A+=st
+    return A
+    
+
+
+
+
+
+
+
+
+
+def rrc_filter(alpha, span, sps):
+    N = span * sps
+    t = np.linspace(-span/2, span/2, N, endpoint=False)
+    t = np.where(t == 0, 1e-8, t)  # avoid divide-by-zero
+    numerator = np.sin(np.pi * t * (1 - alpha)) + 4 * alpha * t * np.cos(np.pi * t * (1 + alpha))
+    denominator = np.pi * t * (1 - (4 * alpha * t) ** 2)
+    h = numerator / denominator
+    h /= np.sqrt(np.sum(h**2))  # Normalize energy
+    return h
+    
+
+
+
+
+#FPGA Calculations
+
 sps = 3
 Rs = 6.144E6 # Sampling rate
 Rd = 4.096E6  # Data rate
@@ -30,7 +148,11 @@ print('Occupaid Band width: ',BW*0.9)
 
 
 
-st = '100101011101010101'
+st = generate_BitStream(Data)
+
+
+
+
 GrayMap = {'00':(1,-1),'01':(1,1),'10':(-1,1),'11':(-1,-1)}
 s = ['0' for i in range(Nb-len(st))]
 s = ''.join(s)
@@ -85,16 +207,6 @@ input()
 
 
 
-
-def rrc_filter(alpha, span, sps):
-    N = span * sps
-    t = np.linspace(-span/2, span/2, N, endpoint=False)
-    t = np.where(t == 0, 1e-8, t)  # avoid divide-by-zero
-    numerator = np.sin(np.pi * t * (1 - alpha)) + 4 * alpha * t * np.cos(np.pi * t * (1 + alpha))
-    denominator = np.pi * t * (1 - (4 * alpha * t) ** 2)
-    h = numerator / denominator
-    h /= np.sqrt(np.sum(h**2))  # Normalize energy
-    return h
 
 h = rrc_filter(0.35,6,3)
 
@@ -169,7 +281,7 @@ input()
 
 # Modulation
 
-DAC_Rd = 5E9
+DAC_Rd = 6.2E9
 vi =Vi * 3 * Interpolation
 Interpolation = DAC_Rd / Sampling_rate
 print('DAC interpolation: ',Interpolation)
