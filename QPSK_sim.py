@@ -6,10 +6,18 @@ from scipy.signal import upfirdn,lfilter,firwin
 
 #Software
 
-USER_DATA = 'SDR_TEAM'
+Block_Size = 108
+No_of_Blocks_Slot = 2
+Slot_Size = Block_Size * No_of_Blocks_Slot
+Packet_Size = Slot_Size * 4
 
+User_Data_Packet_Size = Packet_Size - 32
 
-KEY = 5
+No_of_Slots = 180
+
+Data_Size = No_of_Slots * User_Data_Packet_Size
+
+print('No Bits per second: ',Data_Size * 8)
 
 def Encypt(Data,Key):
     En_Data = ''
@@ -30,21 +38,31 @@ def Find_CheckSum(Data):
         cs+=ord(i)
     return cs
     
-
     
-Data = Encypt(USER_DATA,KEY)
+USER_DATA = 'RADIO-RELAY_PRHP_HCRR_NG-SDR_MANPACK_SFF-SDR_UCR'
+
+
+SRC = 'SYS'
+DES = 'SYS'
+
+
+DATA = SRC+'::'+USER_DATA+'::'+DES
+
+print(DATA)
+
+
+CS = Find_CheckSum(DATA)
+
+
+
+DATA += f'::{CS}'
+
+print(DATA)
+
+KEY = 5
+    
+Data = Encypt(DATA,KEY)
 print(Data)
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -53,9 +71,23 @@ print(Data)
 
 #FPGA Modules
 
+FIFO = [Data]
 
-def generate_BitStream (DATA):
+
+def Generate_BitStream (DATA):
     BS = ''
+    Data_Size = len(DATA)
+    if Data_Size != 216:
+        print('Data size mismatch')
+        if Data_Size > 216:
+            DATA = DATA[:216]
+            print('Excess data truncated')
+            
+        elif Data_Size < 216:
+            for i in range(Data_Size, 216):
+                DATA += '_'
+            print('Random Bits added')
+            
     for i in DATA:
         B=str(bin(ord(i))[2:])
         if len(B) < 8:
@@ -67,7 +99,7 @@ def generate_BitStream (DATA):
 def Data_BitStream (BS):
     j=0
     DATA = ''
-    print(len(BS))
+
     for i in range(8,len(BS)+1,8):
         Char = BS[j:i]
         DATA+= chr(int(Char,2))
@@ -75,8 +107,24 @@ def Data_BitStream (BS):
     return DATA
     
     
-#print(Data_BitStream (generate_BitStream ('dA::9)::')))
-
+def Scrambler (Data,Poly = 'V'):
+    Poly = str(bin(ord(Poly)))[2::]
+    Poly = ('0' + Poly) if len(Poly) < 8 else Poly
+    Poly = '01001101'
+    P = ''
+    OUT = ''
+    for i in range (int(len(Data)/8)):
+        P+=Poly
+    for i in range (len(Data)):
+        OUT += '0' if P[i] == Data[i] else '1'
+    return OUT
+    
+    
+    
+    
+    
+    
+    
 def Interleaver (Data,n,m):
     size = n*m
     if len(Data) > size:
@@ -85,21 +133,37 @@ def Interleaver (Data,n,m):
     elif len(Data) < size:
         
         for i in range(size - len(Data)):
-            Data += '1'
+            Data += '0'
     A = ''
+    M =[[] for i in range(n)]
     
     for i in range (n):
-        st = ''
-        for j in range (i,size,n):
-            
-            st+=Data[j]
-        print(st)
-        A+=st
+        for j in range (i*m,(i*m)+m):
+            M[i].append(Data[j])
+        #print(M[i])
+      
+    for i in range(m):
+        for j in range(n):
+            A+=M[j][i]
+        
     return A
-    
+            
+            
+def GrayMap(Data):
 
+    GrayMap = {'00':(1,1),'01':(1,-1),'10':(-1,-1),'11':(-1,1)}
 
+   
+    _I = []
+    _Q = []
 
+    i = 0
+    while (i<len(Data)):
+      _i,_q = GrayMap[Data[i:i+2]]
+      _I.append(_i)
+      _Q.append(_q)
+      i+=2
+    return [_I,_Q]
 
 
 
@@ -122,88 +186,16 @@ def rrc_filter(alpha, span, sps):
 
 #FPGA Calculations
 
-sps = 3
+sps = 3 # Samples per Symbol
 Rs = 6.144E6 # Sampling rate
 Rd = 4.096E6  # Data rate
 Rb = Rd/2 # In QPSK Symbol rate = Data rate / 2
-T = int(input('Enter time mSec: ')) * 0.8
-T /= 1000
-
-
-N = int(T*Rb*sps) #No_of_Samples
-Nb = int(T*Rd) #No_of_bits
-n = [i for i in range(N)]
-t = np.array(n)/Rs
-
-print('Symbol Rate: ',Rb)
-
-
 
 
 RF = 0.35
 BW = Rb * (1.35)
 Vi = 20
 print('Occupaid Band width: ',BW*0.9)
-
-
-
-
-st = generate_BitStream(Data)
-
-
-
-
-GrayMap = {'00':(1,-1),'01':(1,1),'10':(-1,1),'11':(-1,-1)}
-s = ['0' for i in range(Nb-len(st))]
-s = ''.join(s)
-st +=s
-st = '00'+st
-_I = []
-_Q = []
-
-i = 0
-while (i<len(st)):
-  _i,_q = GrayMap[st[i:i+2]]
-  _I.append(_i)
-  _Q.append(_q)
-  i+=2
-
-Tend = Vi
-plt.cla()
-plt.stem(_I[:Tend],label = 'I Data')
-#plt.stem(_Q[:Tend],label = 'Q data')
-plt.legend()
-plt.title('RAW DATA')
-plt.show(block = False)
-
-input()
-
-
-
-#upsampling
-I = [0 for i in range(len(_I)*3)]
-Q = [0 for i in range(len(_Q)*3)]
-Tend = Vi * 3
-i=0
-s = 1
-
-
-for j in range(0,len(I),3):
-  I[j+s] = _I[i]
-  Q[j+s] = _Q[i]
-  i+=1
-del(i)
-I = np.array(I)
-Q = np.array(Q)
-plt.cla()
-plt.stem(n[:Tend],I[:Tend],label = 'I data')
-#plt.stem(n[:Tend],Q[:Tend],label = 'Q data')
-plt.legend()
-plt.title('UPSAMPLED')
-plt.show(block = False)
-
-input()
-
 
 
 
@@ -219,116 +211,192 @@ plt.show(block = False)
 input()
 
 
+def Modulate (Data):
+    
+    BS = Generate_BitStream (Data)
+    Scr_BS = Scrambler(BS)
+    
+    
+    #print(Scr_BS)
+    
+    
+    print('No of S/W bits in Slot: ', len(Scr_BS))
+    
+    Int_BS = Interleaver (Scr_BS, 3 , 768) # Assume LDPC included in Interleaver 
+    
+    Nb = len(Int_BS)
+    print('No of actual bits in Slot: ', Nb)
+    
+    T = Nb / Rd
+    
+    
+    N = int(Nb * sps / 2)  #No_of_Samples
+    
+    n = [i for i in range(N)]
+    t = np.array(n)/Rs
+
+    print('Symbol Rate: ',Rb)
+    
+    #print(Int_BS)
+
+    IQ = GrayMap(Int_BS)
+    _I,_Q = IQ[0] , IQ[1]
+    
+
+    Tend = Vi
+    plt.cla()
+    plt.stem(_I[:Tend],label = 'I Data')
+    #plt.stem(_Q[:Tend],label = 'Q data')
+    plt.legend()
+    plt.title('RAW DATA')
+    plt.show(block = False)
+
+    input()
+
+
+
+    #upsampling
+    I = [0 for i in range(len(_I)*3)]
+    Q = [0 for i in range(len(_Q)*3)]
+    Tend = Vi * 3
+    i=0
+    s = 1
+
+
+    for j in range(0,len(I),3):
+      I[j+s] = _I[i]
+      Q[j+s] = _Q[i]
+      i+=1
+    del(i)
+    I = np.array(I)
+    Q = np.array(Q)
+    plt.cla()
+    plt.stem(n[:Tend],I[:Tend],label = 'I data')
+    #plt.stem(n[:Tend],Q[:Tend],label = 'Q data')
+    plt.legend()
+    plt.title('UPSAMPLED')
+    plt.show(block = False)
+
+    input()
+
+
+
+    up_I = np.convolve(I, h, mode='same')
+    up_Q = np.convolve(Q, h, mode='same')
+
+    plt.cla()
+    plt.plot(n[:Tend],up_I[:Tend],label = 'I data')
+    plt.plot(n[:Tend],up_Q[:Tend],label = 'Q data')
+    plt.legend()
+
+    plt.title('Pulse Shape after RRC Filter')
+    plt.grid()
+    plt.show(block = False)
+
+    input()
+
+
+
+    Interpolation  = 30
+    Sampling_rate = Rs * Interpolation
+    print('Sampling Rate: ',Sampling_rate)
+
+    # === FIR Low-pass Filter Design (Anti-Imaging) ===
+    cutoff = Rs / 2  # 3.072 MHz cutoff
+    num_taps = 121
+    lpf = firwin(num_taps, cutoff / (Sampling_rate / 2), window='hamming')
 
 
 
 
-up_I = np.convolve(I, h, mode='same')
-up_Q = np.convolve(Q, h, mode='same')
+    ip_I = upfirdn([1],up_I,up = Interpolation)
+    ip_Q = upfirdn([1],up_Q,up = Interpolation)
 
-plt.cla()
-plt.plot(n[:Tend],up_I[:Tend],label = 'I data')
-plt.plot(n[:Tend],up_Q[:Tend],label = 'Q data')
-plt.legend()
+    Tend = Vi * 3 *Interpolation
 
-plt.title('Pulse Shape after RRC Filter')
-plt.grid()
-plt.show(block = False)
+    '''plt.plot(ip_I[:Tend],label = 'I data')
+    plt.plot(ip_Q[:Tend],label = 'Q data')
+    plt.legend()
+    plt.title('Interpolation Output')
+    plt.grid()
+    plt.show()'''
 
-input()
+    # === Apply Filter ===
+    DAC_I = lfilter(lpf, 1.0, ip_I)
+    DAC_Q = lfilter(lpf, 1.0, ip_Q)
 
+    plt.cla()
+    plt.plot(n[:Tend], DAC_I[:Tend],label = 'I data')
+    plt.plot(n[:Tend], DAC_Q[:Tend],label = 'Q data')
+    plt.legend()
+    plt.title('Interpolation and Low-Pass Filter')
+    plt.grid()
+    plt.show(block = False)
 
-
-Interpolation  = 30
-Sampling_rate = Rs * Interpolation
-print('Sampling Rate: ',Sampling_rate)
-
-# === FIR Low-pass Filter Design (Anti-Imaging) ===
-cutoff = Rs / 2  # 3.072 MHz cutoff
-num_taps = 121
-lpf = firwin(num_taps, cutoff / (Sampling_rate / 2), window='hamming')
-
-
-
-
-ip_I = upfirdn([1],up_I,up = Interpolation)
-ip_Q = upfirdn([1],up_Q,up = Interpolation)
-
-Tend = Vi * 3 *Interpolation
-
-'''plt.plot(ip_I[:Tend],label = 'I data')
-plt.plot(ip_Q[:Tend],label = 'Q data')
-plt.legend()
-plt.title('Interpolation Output')
-plt.grid()
-plt.show()'''
-
-# === Apply Filter ===
-DAC_I = lfilter(lpf, 1.0, ip_I)
-DAC_Q = lfilter(lpf, 1.0, ip_Q)
-
-plt.cla()
-plt.plot(n[:Tend], DAC_I[:Tend],label = 'I data')
-plt.plot(n[:Tend], DAC_Q[:Tend],label = 'Q data')
-plt.legend()
-plt.title('Interpolation and Low-Pass Filter')
-plt.grid()
-plt.show(block = False)
-
-input()
+    input()
 
 
 
-# Modulation
+    # Modulation
 
-DAC_Rd = 6.2E9
-vi =Vi * 3 * Interpolation
-Interpolation = DAC_Rd / Sampling_rate
-print('DAC interpolation: ',Interpolation)
-Tend = int(vi * Interpolation)
-
-
-lpf = firwin(num_taps, (Sampling_rate / 2) / (DAC_Rd / 2), window='hamming')
+    DAC_Rd = 6.2E9
+    vi =Vi * 3 * Interpolation
+    Interpolation = DAC_Rd / Sampling_rate
+    print('DAC interpolation: ',Interpolation)
+    Tend = int(vi * Interpolation)
 
 
-DAC_upI = upfirdn([1],DAC_I,up = Interpolation)
-DAC_upQ = upfirdn([1],DAC_Q,up = Interpolation)
+    lpf = firwin(num_taps, (Sampling_rate / 2) / (DAC_Rd / 2), window='hamming')
 
 
-DAC_upI = lfilter(lpf, 1.0, DAC_upI)
-DAC_upQ = lfilter(lpf, 1.0, DAC_upQ)
-
-tfc = np.arange(len(DAC_upI)) / DAC_Rd
-
-Fc = 3E6
-
-Sig_I = DAC_upI * np.cos(2 * np.pi * Fc * tfc)
-Sig_Q = DAC_upQ * np.sin(2 * np.pi * Fc * tfc)
-
-plt.cla()
-plt.plot(Sig_I[:Tend],label = 'I data')
-plt.plot(Sig_Q[:Tend],label = 'Q data')
-plt.legend()
-plt.title('Interpolation in DAC')
-plt.grid()
-
-plt.show(block = False)
-
-input()
+    DAC_upI = upfirdn([1],DAC_I,up = Interpolation)
+    DAC_upQ = upfirdn([1],DAC_Q,up = Interpolation)
 
 
-DAC_GAIN = 0
-Sig_I = Sig_I * (2**DAC_GAIN)
-Sig_Q = Sig_Q * (2**DAC_GAIN)
+    DAC_upI = lfilter(lpf, 1.0, DAC_upI)
+    DAC_upQ = lfilter(lpf, 1.0, DAC_upQ)
+
+    tfc = np.arange(len(DAC_upI)) / DAC_Rd
+
+    Fc = int(input('Enter Frequency(kHz): '))*1000
+
+    Sig_I = DAC_upI * np.cos(2 * np.pi * Fc * tfc)
+    Sig_Q = DAC_upQ * np.sin(2 * np.pi * Fc * tfc)
+
+    plt.cla()
+    plt.plot(Sig_I[:Tend],label = 'I data')
+    plt.plot(Sig_Q[:Tend],label = 'Q data')
+    plt.legend()
+    plt.title('Interpolation in DAC')
+    plt.grid()
+
+    plt.show(block = False)
+
+    input()
 
 
-DAC_OUT = Sig_I - Sig_Q
+    DAC_GAIN = 0
+    Sig_I = Sig_I * (2**DAC_GAIN)
+    Sig_Q = Sig_Q * (2**DAC_GAIN)
 
-plt.cla()
-plt.plot(tfc[:Tend],DAC_OUT[:Tend],label = 'DAC data')
-plt.legend()
-plt.title('Final DAC Output')
-plt.grid()
-plt.show(block = False)
 
-input()
+    DAC_OUT = Sig_I - Sig_Q
+
+    plt.cla()
+    plt.plot(tfc[:Tend],DAC_OUT[:Tend],label = 'DAC data')
+    plt.legend()
+    plt.title('Final DAC Output')
+    plt.grid()
+    plt.show(block = False)
+
+    input()
+
+
+
+
+
+
+
+
+for i in FIFO:
+    Modulate(i)
