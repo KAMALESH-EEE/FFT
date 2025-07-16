@@ -194,13 +194,13 @@ Rb = Rd/2 # In QPSK Symbol rate = Data rate / 2
 
 RF = 0.35
 BW = Rb * (1.35)
+
+print('Occupaid Band width: ',BW* 8.4)
+
+
 Vi = 20
-print('Occupaid Band width: ',BW*0.9)
 
-
-
-
-h = rrc_filter(0.35,6,3)
+h = rrc_filter(0,6,3)
 
 plt.cla()
 plt.plot(h)
@@ -302,7 +302,7 @@ def Modulate (Data):
     print('Sampling Rate: ',Sampling_rate)
 
     # === FIR Low-pass Filter Design (Anti-Imaging) ===
-    cutoff = Rs / 2  # 3.072 MHz cutoff
+    cutoff = Rs / 2.5  # 3.072 MHz cutoff
     num_taps = 121
     lpf = firwin(num_taps, cutoff / (Sampling_rate / 2), window='hamming')
 
