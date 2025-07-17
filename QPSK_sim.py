@@ -42,39 +42,35 @@ def Find_CheckSum(Data):
 USER_DATA = 'RADIO-RELAY_PRHP_HCRR_NG-SDR_MANPACK_SFF-SDR_UCR'
 
 
-SRC = 'SYS'
-DES = 'SYS'
+SRC = '10.5.15.25'
+DES = '10.5.15.20'
 
 
-DATA = SRC+'::'+USER_DATA+'::'+DES
+ETH_DATA = SRC+'::'+USER_DATA+'::'+DES
 
-print(DATA)
-
-
-CS = Find_CheckSum(DATA)
+print('Ethernet Data',ETH_DATA)
 
 
+CS = Find_CheckSum(ETH_DATA)
 
-DATA += f'::{CS}'
 
-print(DATA)
+
+SLOT_DATA =ETH_DATA + f'::{CS}'
+
+print(SLOT_DATA)
 
 KEY = 5
     
-Data = Encypt(DATA,KEY)
-print(Data)
-
-
-
-
-
 
 #FPGA Modules
 
-FIFO = [Data]
+FIFO = [SLOT_DATA]
 
 
 def Generate_BitStream (DATA):
+    DATA = Encypt(DATA,KEY)
+    print(DATA)
+    
     BS = ''
     Data_Size = len(DATA)
     if Data_Size != 216:
@@ -326,15 +322,16 @@ def Modulate (Data):
     DAC_Q = lfilter(lpf, 1.0, ip_Q)
 
     plt.cla()
+    
     plt.plot(n[:Tend], DAC_I[:Tend],label = 'I data')
-    plt.plot(n[:Tend], DAC_Q[:Tend],label = 'Q data')
+    #plt.plot(n[:Tend], DAC_Q[:Tend],label = 'Q data')
     plt.legend()
     plt.title('Interpolation and Low-Pass Filter')
     plt.grid()
     plt.show(block = False)
 
     input()
-
+    plt.savefig('DAC_IN')
 
 
     # Modulation
@@ -388,15 +385,55 @@ def Modulate (Data):
     plt.title('Final DAC Output')
     plt.grid()
     plt.show(block = False)
-
+    print(Tend)
     input()
 
+    return DAC_OUT
+
+
+def Demodulate (ADC_IN):
+
+    tfc = np.arange(len(ADC_IN)) / 6.2E9
+
+    Fc = int(input('Enter Frequency(kHz): '))*1000
+
+    Sig_I = ADC_IN * np.cos(2 * np.pi * Fc * tfc)
+    Sig_Q = ADC_IN * np.sin(2 * np.pi * Fc * tfc)
+    
+    plt.cla()
+    plt.plot(tfc[:60546],Sig_I[:60546],label = 'ADC data')
+    plt.legend()
+    plt.title('Final ADC Output')
+    plt.grid()
+    plt.show(block = False)
+
+    input()
+    plt.savefig('ADC_OUT')
 
 
 
 
 
+
+
+
+ADC_IN =[]
 
 
 for i in FIFO:
-    Modulate(i)
+    TX = Modulate(i)
+    print(TX[:10])
+    Noise = np.random.randint(0,10,size= (len(TX)))
+    Noise = Noise * 1e-10
+    TX = TX + Noise
+    plt.cla()
+    plt.plot(TX[:60546],label = 'TX')
+    plt.legend()
+    plt.title('TX + Noise')
+    plt.grid()
+    plt.show(block = False)
+    print(TX[:10])
+    input()
+
+
+    Demodulate(TX)
