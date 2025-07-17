@@ -179,7 +179,6 @@ def rrc_filter(alpha, span, sps):
 
 
 
-
 #FPGA Calculations
 
 sps = 3 # Samples per Symbol
@@ -197,6 +196,12 @@ print('Occupaid Band width: ',BW* 8.4)
 Vi = 20
 
 h = rrc_filter(0,6,3)
+
+
+# === FIR Low-pass Filter Design (Anti-Imaging) ===
+cutoff = Rs / 2.5  # 3.072 MHz cutoff
+num_taps = 121
+lpf = firwin(num_taps, cutoff / ((Rs*30) / 2), window='hamming')
 
 plt.cla()
 plt.plot(h)
@@ -297,18 +302,13 @@ def Modulate (Data):
     Sampling_rate = Rs * Interpolation
     print('Sampling Rate: ',Sampling_rate)
 
-    # === FIR Low-pass Filter Design (Anti-Imaging) ===
-    cutoff = Rs / 2.5  # 3.072 MHz cutoff
-    num_taps = 121
-    lpf = firwin(num_taps, cutoff / (Sampling_rate / 2), window='hamming')
-
-
-
 
     ip_I = upfirdn([1],up_I,up = Interpolation)
     ip_Q = upfirdn([1],up_Q,up = Interpolation)
 
     Tend = Vi * 3 *Interpolation
+
+    print(len(up_I),len(ip_I))
 
     '''plt.plot(ip_I[:Tend],label = 'I data')
     plt.plot(ip_Q[:Tend],label = 'Q data')
@@ -318,6 +318,8 @@ def Modulate (Data):
     plt.show()'''
 
     # === Apply Filter ===
+    global lpf
+
     DAC_I = lfilter(lpf, 1.0, ip_I)
     DAC_Q = lfilter(lpf, 1.0, ip_Q)
 
@@ -403,19 +405,31 @@ def Demodulate (ADC_IN):
     plt.cla()
     plt.plot(tfc[:60546],Sig_I[:60546],label = 'ADC data')
     plt.legend()
-    plt.title('Final ADC Output')
+    plt.title('ADC IQ sepration')
     plt.grid()
     plt.show(block = False)
 
     input()
+    
+
+
+
+    ADC_dn_I = upfirdn([1],Sig_I,down = 33.63715277777778)
+    ADC_dn_Q = upfirdn([1],Sig_Q, down = 33.63715277777778)
+
+
+    ADC_dn_I = lfilter(lpf, 1.0, ADC_dn_I)
+    ADC_dn_Q = lfilter(lpf, 1.0, ADC_dn_Q)
+
+
+    plt.cla()
+    plt.plot(tfc[:1800],ADC_dn_I[:1800],label = 'ADC data')
+    plt.legend()
+    plt.title('Final ADC Output')
+    plt.grid()
+    plt.show(block = False)
+    input()
     plt.savefig('ADC_OUT')
-
-
-
-
-
-
-
 
 ADC_IN =[]
 
@@ -424,7 +438,7 @@ for i in FIFO:
     TX = Modulate(i)
     print(TX[:10])
     Noise = np.random.randint(0,10,size= (len(TX)))
-    Noise = Noise * 1e-10
+    Noise = Noise * (TX.max() / 100)
     TX = TX + Noise
     plt.cla()
     plt.plot(TX[:60546],label = 'TX')
