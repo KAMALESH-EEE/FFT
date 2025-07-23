@@ -59,7 +59,7 @@ SLOT_DATA =ETH_DATA + f'::{CS}'
 
 print(SLOT_DATA)
 
-KEY = 5
+KEY = 0
     
 
 #FPGA Modules
@@ -143,11 +143,10 @@ def Interleaver (Data,n,m):
             A+=M[j][i]
         
     return A
-            
-            
+
 def GrayMap(Data):
 
-    GrayMap = {'00':(1,1),'01':(1,-1),'10':(-1,-1),'11':(-1,1)}
+    Graymap = {'00':(1,1),'01':(1,-1),'10':(-1,-1),'11':(-1,1)}
 
    
     _I = []
@@ -155,15 +154,20 @@ def GrayMap(Data):
 
     i = 0
     while (i<len(Data)):
-      _i,_q = GrayMap[Data[i:i+2]]
+      _i,_q = Graymap[Data[i:i+2]]
       _I.append(_i)
       _Q.append(_q)
       i+=2
     return [_I,_Q]
 
+def Grayde_Map(Sample):
+    Data = ''
+    Graymap = {(1,1):'00',(1,-1):'01', (-1,-1):'10',(-1,1):'11'}
+    for k in Sample:
+        iq = (-1 if k.real < 0 else 1) , (-1 if k.imag < 0 else 1)
+        Data+=Graymap[iq]
 
-
-
+    return Data
 
 
 def rrc_filter(alpha, span, sps):
@@ -177,7 +181,7 @@ def rrc_filter(alpha, span, sps):
     return h
     
 
-
+Test_S = None
 
 #FPGA Calculations
 
@@ -194,6 +198,12 @@ print('Occupaid Band width: ',BW* 8.4)
 
 
 Vi = 20
+
+ConSine = [1 if i%2 == 0 else -1 for i in range(10)]
+PreAmple = [1,1,1,1,1,1,1,1,0,0,0-1,-1,-1,-1,0,0,0,0,0,0,0]
+
+
+
 
 h = rrc_filter(0,6,3)
 
@@ -213,6 +223,8 @@ input()
 
 
 def Modulate (Data):
+
+    global Test_S
     
     BS = Generate_BitStream (Data)
     Scr_BS = Scrambler(BS)
@@ -239,9 +251,11 @@ def Modulate (Data):
     print('Symbol Rate: ',Rb)
     
     #print(Int_BS)
-
+    print(len(Int_BS))
+    
     IQ = GrayMap(Int_BS)
     _I,_Q = IQ[0] , IQ[1]
+    
     
 
     Tend = Vi
@@ -254,7 +268,10 @@ def Modulate (Data):
 
     input()
 
-
+    _I = PreAmple+_I
+    _Q = PreAmple+_Q
+    _I = ConSine+_I
+    _Q = ConSine+_Q
 
     #upsampling
     I = [0 for i in range(len(_I)*3)]
@@ -264,13 +281,22 @@ def Modulate (Data):
     s = 1
 
 
+
+
     for j in range(0,len(I),3):
       I[j+s] = _I[i]
       Q[j+s] = _Q[i]
       i+=1
     del(i)
+
+
+
     I = np.array(I)
     Q = np.array(Q)
+
+
+
+
     plt.cla()
     plt.stem(n[:Tend],I[:Tend],label = 'I data')
     #plt.stem(n[:Tend],Q[:Tend],label = 'Q data')
@@ -284,6 +310,8 @@ def Modulate (Data):
 
     up_I = np.convolve(I, h, mode='same')
     up_Q = np.convolve(Q, h, mode='same')
+
+    
 
     plt.cla()
     plt.plot(n[:Tend],up_I[:Tend],label = 'I data')
@@ -306,6 +334,8 @@ def Modulate (Data):
     ip_I = upfirdn([1],up_I,up = Interpolation)
     ip_Q = upfirdn([1],up_Q,up = Interpolation)
 
+  
+
     Tend = Vi * 3 *Interpolation
 
     print(len(up_I),len(ip_I))
@@ -322,6 +352,8 @@ def Modulate (Data):
 
     DAC_I = lfilter(lpf, 1.0, ip_I)
     DAC_Q = lfilter(lpf, 1.0, ip_Q)
+
+    
 
     plt.cla()
     
@@ -340,7 +372,7 @@ def Modulate (Data):
 
     DAC_Rd = 6.2E9
     vi =Vi * 3 * Interpolation
-    Interpolation = DAC_Rd / Sampling_rate
+    Interpolation = 33
     print('DAC interpolation: ',Interpolation)
     Tend = int(vi * Interpolation)
 
@@ -355,12 +387,18 @@ def Modulate (Data):
     DAC_upI = lfilter(lpf, 1.0, DAC_upI)
     DAC_upQ = lfilter(lpf, 1.0, DAC_upQ)
 
+   
+
     tfc = np.arange(len(DAC_upI)) / DAC_Rd
 
-    Fc = int(input('Enter Frequency(kHz): '))*1000
+    Fc = 100000000
+
+    #Fc = int(input('Enter Frequency(kHz): '))*1000
 
     Sig_I = DAC_upI * np.cos(2 * np.pi * Fc * tfc)
     Sig_Q = DAC_upQ * np.sin(2 * np.pi * Fc * tfc)
+
+    
 
     plt.cla()
     plt.plot(Sig_I[:Tend],label = 'I data')
@@ -380,7 +418,7 @@ def Modulate (Data):
 
 
     DAC_OUT = Sig_I - Sig_Q
-
+    Test_S = DAC_OUT
     plt.cla()
     plt.plot(tfc[:Tend],DAC_OUT[:Tend],label = 'DAC data')
     plt.legend()
@@ -395,12 +433,24 @@ def Modulate (Data):
 
 def Demodulate (ADC_IN):
 
+    global Test_S
+
     tfc = np.arange(len(ADC_IN)) / 6.2E9
 
-    Fc = int(input('Enter Frequency(kHz): '))*1000
+    
+    RX_Gain = 7
+    ADC_IN = ADC_IN * (2**RX_Gain)
+   
+    #Fc = int(input('Enter Frequency(kHz): '))*1000
+
+    Fc = 100000000
+    ADC_IN = Test_S
+    
 
     Sig_I = ADC_IN * np.cos(2 * np.pi * Fc * tfc)
     Sig_Q = ADC_IN * np.sin(2 * np.pi * Fc * tfc)
+
+
     
     plt.cla()
     plt.plot(tfc[:60546],Sig_I[:60546],label = 'ADC data')
@@ -411,11 +461,12 @@ def Demodulate (ADC_IN):
 
     input()
     
+    lpf = firwin(num_taps, (184.32e6 / 2) / (6.2e9 / 2), window='hamming')
 
+ 
 
-
-    ADC_dn_I = upfirdn([1],Sig_I,down = 33.63715277777778)
-    ADC_dn_Q = upfirdn([1],Sig_Q, down = 33.63715277777778)
+    ADC_dn_I = upfirdn([1],Sig_I,down = 33)
+    ADC_dn_Q = upfirdn([1],Sig_Q, down = 33)
 
 
     ADC_dn_I = lfilter(lpf, 1.0, ADC_dn_I)
@@ -430,6 +481,81 @@ def Demodulate (ADC_IN):
     plt.show(block = False)
     input()
     plt.savefig('ADC_OUT')
+
+
+    dc_I = upfirdn([1],ADC_dn_I,down = 30)
+    dc_Q = upfirdn([1],ADC_dn_Q, down = 30)
+
+    plt.cla()
+    plt.plot(tfc[50:120],dc_I[50:120],label = 'I')
+    plt.legend()
+    plt.title('Decipolation')
+    plt.grid()
+    plt.show(block = False)
+    input()
+
+
+
+
+
+
+    rrc_I = np.convolve(dc_I,h, mode='same')
+    rrc_Q = np.convolve(dc_Q,h, mode='same')
+
+    rrc_I = dc_I
+    rrc_Q = dc_Q
+
+    plt.cla()
+    plt.plot(rrc_I[50:120],label = 'I')
+    plt.legend()
+    plt.title('RX RRC Out')
+    plt.grid()
+    plt.show(block = False)
+    input()
+
+
+
+
+    dn_I = []
+    dn_Q = []
+
+    for i in range(0,len(rrc_I),3):
+        dn_I.append( np.sum(rrc_I[i+1:i+2]))
+        dn_Q.append( np.sum(rrc_Q[i+1:i+2]))
+
+    dn_I = dn_I[len(ConSine)+len(PreAmple):]
+    dn_Q = dn_Q[len(ConSine)+len(PreAmple):]
+    
+    
+
+    dn_DATA = (np.array(dn_I)) + (1j * np.array(dn_Q))
+
+    # plt.close()
+    # plt.figure(figsize=(6, 6))
+    # plt.scatter(dn_DATA.real[:20], dn_DATA.imag[:20], s=2, color='blue', alpha=0.6)
+    # plt.axhline(0, color='black', lw=0.5)
+    # plt.axvline(0, color='black', lw=0.5)
+    # plt.grid(True, linestyle='--', alpha=0.5)
+    # plt.title('Constellation Diagram')
+    # plt.xlabel("In-phase (I)")
+    # plt.ylabel("Quadrature (Q)")
+    # plt.axis('equal')
+    # plt.xlim([-1.5, 1.5])
+    # plt.ylim([-1.5, 1.5])
+    # plt.show()
+
+    
+    dn_DATA = list(dn_DATA)
+
+    DATA = Grayde_Map(dn_DATA)
+
+    print(len(DATA))
+
+    Int_BS = Interleaver (DATA, 768,3)
+
+    Scr_BS = Scrambler(Int_BS)
+    BS = Data_BitStream (Scr_BS)
+    print(BS)
 
 ADC_IN =[]
 
@@ -446,7 +572,6 @@ for i in FIFO:
     plt.title('TX + Noise')
     plt.grid()
     plt.show(block = False)
-    print(TX[:10])
     input()
 
 
