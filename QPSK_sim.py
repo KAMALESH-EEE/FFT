@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import upfirdn,lfilter,firwin
 
-
+from random import choice
 
 #Software
 
@@ -200,12 +200,12 @@ print('Occupaid Band width: ',BW* 8.4)
 Vi = 20
 
 ConSine = [1 if i%2 == 0 else -1 for i in range(10)]
-PreAmple = [1,1,1,1,1,1,1,1,0,0,0-1,-1,-1,-1,0,0,0,0,0,0,0]
-
-
 
 
 h = rrc_filter(0,6,3)
+
+X1 = np.array([1, -1, 1, -1, -1, -1, -1, -1, 1, -1, 1, -1, -1, -1, 1, -1, -1, 1, -1, -1, 1, 1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1, 1, 1, 1, 1, -1, -1, 1, 1, -1, -1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, -1, 1, -1, 1, 1, 1, -1, 1, -1, 1, 1, -1, 1, 1, -1, 1, -1, 1])
+preamble = X1*1.5
 
 
 # === FIR Low-pass Filter Design (Anti-Imaging) ===
@@ -221,17 +221,14 @@ plt.show(block = False)
 
 input()
 
+stt = 0
 
 def Modulate (Data):
 
     global Test_S
     
     BS = Generate_BitStream (Data)
-    Scr_BS = Scrambler(BS)
-    
-    
-    #print(Scr_BS)
-    
+    Scr_BS = Scrambler(BS)    
     
     print('No of S/W bits in Slot: ', len(Scr_BS))
     
@@ -256,50 +253,44 @@ def Modulate (Data):
     IQ = GrayMap(Int_BS)
     _I,_Q = IQ[0] , IQ[1]
     
-    
 
-    Tend = Vi
     plt.cla()
-    plt.stem(_I[:Tend],label = 'I Data')
-    #plt.stem(_Q[:Tend],label = 'Q data')
+    plt.stem(_I,label = 'I Data')
+    #plt.stem(_Q,label = 'Q data')
     plt.legend()
     plt.title('RAW DATA')
     plt.show(block = False)
 
     input()
 
-    _I = PreAmple+_I
-    _Q = PreAmple+_Q
-    _I = ConSine+_I
-    _Q = ConSine+_Q
+    _I = list(preamble)+_I
+    _Q = list(preamble)+_Q
 
     #upsampling
     I = [0 for i in range(len(_I)*3)]
     Q = [0 for i in range(len(_Q)*3)]
-    Tend = Vi * 3
+    PreD =  [0 for i in range(len(preamble)*3)]
     i=0
     s = 1
-
-
-
 
     for j in range(0,len(I),3):
       I[j+s] = _I[i]
       Q[j+s] = _Q[i]
       i+=1
+    i=0
+ 
+    for j in range(0,len(PreD),3):
+        PreD[j+s] = preamble[i]
+        i+=1
     del(i)
-
-
 
     I = np.array(I)
     Q = np.array(Q)
 
 
-
-
     plt.cla()
-    plt.stem(n[:Tend],I[:Tend],label = 'I data')
-    #plt.stem(n[:Tend],Q[:Tend],label = 'Q data')
+    plt.stem(I,label = 'I data')
+    #plt.stem(n[Q,label = 'Q data')
     plt.legend()
     plt.title('UPSAMPLED')
     plt.show(block = False)
@@ -311,11 +302,16 @@ def Modulate (Data):
     up_I = np.convolve(I, h, mode='same')
     up_Q = np.convolve(Q, h, mode='same')
 
-    
+    PreD = list(np.convolve(np.array(PreD), h, mode='same'))
+    Peek = max(PreD)
+
+    StPeek = PreD.index(Peek)
+    print(Peek ,'@', StPeek)
+    print(len(PreD) - StPeek)
 
     plt.cla()
-    plt.plot(n[:Tend],up_I[:Tend],label = 'I data')
-    plt.plot(n[:Tend],up_Q[:Tend],label = 'Q data')
+    plt.plot(up_I,label = 'I data')
+    plt.plot(up_Q,label = 'Q data')
     plt.legend()
 
     plt.title('Pulse Shape after RRC Filter')
@@ -336,8 +332,6 @@ def Modulate (Data):
 
   
 
-    Tend = Vi * 3 *Interpolation
-
     print(len(up_I),len(ip_I))
 
     '''plt.plot(ip_I[:Tend],label = 'I data')
@@ -357,8 +351,8 @@ def Modulate (Data):
 
     plt.cla()
     
-    plt.plot(n[:Tend], DAC_I[:Tend],label = 'I data')
-    #plt.plot(n[:Tend], DAC_Q[:Tend],label = 'Q data')
+    plt.plot(DAC_I,label = 'I data')
+    #plt.plot(DAC_Q,label = 'Q data')
     plt.legend()
     plt.title('Interpolation and Low-Pass Filter')
     plt.grid()
@@ -371,11 +365,9 @@ def Modulate (Data):
     # Modulation
 
     DAC_Rd = 6.2E9
-    vi =Vi * 3 * Interpolation
+ 
     Interpolation = 33
     print('DAC interpolation: ',Interpolation)
-    Tend = int(vi * Interpolation)
-
 
     lpf = firwin(num_taps, (Sampling_rate / 2) / (DAC_Rd / 2), window='hamming')
 
@@ -391,9 +383,9 @@ def Modulate (Data):
 
     tfc = np.arange(len(DAC_upI)) / DAC_Rd
 
-    Fc = 100000000
+    Fc = 100e6
 
-    #Fc = int(input('Enter Frequency(kHz): '))*1000
+    #Fc = int(input('Enter Frequency(MHz): '))*1e6
 
     Sig_I = DAC_upI * np.cos(2 * np.pi * Fc * tfc)
     Sig_Q = DAC_upQ * np.sin(2 * np.pi * Fc * tfc)
@@ -401,8 +393,8 @@ def Modulate (Data):
     
 
     plt.cla()
-    plt.plot(Sig_I[:Tend],label = 'I data')
-    plt.plot(Sig_Q[:Tend],label = 'Q data')
+    plt.plot(Sig_I,label = 'I data')
+    plt.plot(Sig_Q,label = 'Q data')
     plt.legend()
     plt.title('Interpolation in DAC')
     plt.grid()
@@ -411,21 +403,19 @@ def Modulate (Data):
 
     input()
 
-
     DAC_GAIN = 0
     Sig_I = Sig_I * (2**DAC_GAIN)
     Sig_Q = Sig_Q * (2**DAC_GAIN)
 
-
     DAC_OUT = Sig_I - Sig_Q
     Test_S = DAC_OUT
     plt.cla()
-    plt.plot(tfc[:Tend],DAC_OUT[:Tend],label = 'DAC data')
+    plt.plot(DAC_OUT,label = 'DAC data')
     plt.legend()
     plt.title('Final DAC Output')
     plt.grid()
     plt.show(block = False)
-    print(Tend)
+
     input()
 
     return DAC_OUT
@@ -440,10 +430,12 @@ def Demodulate (ADC_IN):
     
     RX_Gain = 7
     ADC_IN = ADC_IN * (2**RX_Gain)
-   
-    #Fc = int(input('Enter Frequency(kHz): '))*1000
 
     Fc = 100000000
+
+   
+    #Fc = int(input('Enter Frequency(MHz): '))*1e6
+
     ADC_IN = Test_S
     
 
@@ -453,7 +445,7 @@ def Demodulate (ADC_IN):
 
     
     plt.cla()
-    plt.plot(tfc[:60546],Sig_I[:60546],label = 'ADC data')
+    plt.plot(Sig_I,label = 'ADC data')
     plt.legend()
     plt.title('ADC IQ sepration')
     plt.grid()
@@ -473,8 +465,10 @@ def Demodulate (ADC_IN):
     ADC_dn_Q = lfilter(lpf, 1.0, ADC_dn_Q)
 
 
+    print(max(ADC_dn_I))
+
     plt.cla()
-    plt.plot(tfc[:1800],ADC_dn_I[:1800],label = 'ADC data')
+    plt.plot(ADC_dn_I,label = 'ADC data')
     plt.legend()
     plt.title('Final ADC Output')
     plt.grid()
@@ -487,7 +481,7 @@ def Demodulate (ADC_IN):
     dc_Q = upfirdn([1],ADC_dn_Q, down = 30)
 
     plt.cla()
-    plt.plot(tfc[50:120],dc_I[50:120],label = 'I')
+    plt.plot(dc_I,label = 'I')
     plt.legend()
     plt.title('Decipolation')
     plt.grid()
@@ -506,7 +500,7 @@ def Demodulate (ADC_IN):
     rrc_Q = dc_Q
 
     plt.cla()
-    plt.plot(rrc_I[50:120],label = 'I')
+    plt.plot(rrc_I,label = 'I')
     plt.legend()
     plt.title('RX RRC Out')
     plt.grid()
@@ -523,8 +517,8 @@ def Demodulate (ADC_IN):
         dn_I.append( np.sum(rrc_I[i+1:i+2]))
         dn_Q.append( np.sum(rrc_Q[i+1:i+2]))
 
-    dn_I = dn_I[len(ConSine)+len(PreAmple):]
-    dn_Q = dn_Q[len(ConSine)+len(PreAmple):]
+    dn_I = dn_I[len(preamble):]
+    dn_Q = dn_Q[len(preamble):]
     
     
 
@@ -549,6 +543,7 @@ def Demodulate (ADC_IN):
 
     DATA = Grayde_Map(dn_DATA)
 
+
     print(len(DATA))
 
     Int_BS = Interleaver (DATA, 768,3)
@@ -562,12 +557,12 @@ ADC_IN =[]
 
 for i in FIFO:
     TX = Modulate(i)
-    print(TX[:10])
+
     Noise = np.random.randint(0,10,size= (len(TX)))
     Noise = Noise * (TX.max() / 100)
     TX = TX + Noise
     plt.cla()
-    plt.plot(TX[:60546],label = 'TX')
+    plt.plot(TX,label = 'TX')
     plt.legend()
     plt.title('TX + Noise')
     plt.grid()
