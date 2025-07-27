@@ -379,8 +379,6 @@ def Modulate (Data):
     DAC_upI = lfilter(lpf, 1.0, DAC_upI)
     DAC_upQ = lfilter(lpf, 1.0, DAC_upQ)
 
-   
-
     tfc = np.arange(len(DAC_upI)) / DAC_Rd
 
     Fc = 100e6
@@ -426,23 +424,18 @@ def Demodulate (ADC_IN):
     global Test_S
 
     tfc = np.arange(len(ADC_IN)) / 6.2E9
-
-    
+ 
     RX_Gain = 7
     ADC_IN = ADC_IN * (2**RX_Gain)
 
     Fc = 100000000
-
-   
+  
     #Fc = int(input('Enter Frequency(MHz): '))*1e6
 
     ADC_IN = Test_S
-    
 
     Sig_I = ADC_IN * np.cos(2 * np.pi * Fc * tfc)
     Sig_Q = ADC_IN * np.sin(2 * np.pi * Fc * tfc)
-
-
     
     plt.cla()
     plt.plot(Sig_I,label = 'ADC data')
