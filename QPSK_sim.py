@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import upfirdn,lfilter,firwin
+from scipy.signal import upfirdn,lfilter,firwin,correlate
 
 from random import choice
 
@@ -67,6 +67,8 @@ KEY = 0
 FIFO = [SLOT_DATA]
 
 
+
+
 def Generate_BitStream (DATA):
     DATA = Encypt(DATA,KEY)
     print(DATA)
@@ -114,12 +116,7 @@ def Scrambler (Data,Poly = 'V'):
     for i in range (len(Data)):
         OUT += '0' if P[i] == Data[i] else '1'
     return OUT
-    
-    
-    
-    
-    
-    
+ 
     
 def Interleaver (Data,n,m):
     size = n*m
@@ -165,10 +162,33 @@ def Grayde_Map(Sample):
     Graymap = {(1,1):'00',(1,-1):'01', (-1,-1):'10',(-1,1):'11'}
     for k in Sample:
         iq = (-1 if k.real < 0 else 1) , (-1 if k.imag < 0 else 1)
-        Data+=Graymap[iq]
-
+        Data += Graymap[iq]
+        
     return Data
 
+
+preamble = [1,1,-1,1,1,-1,1,1,-1,1,-1,-1,1,1,-1,1,1]
+Con_sine = [-1,1,-1,1,-1,1,-1,1,-1,1,-1,1,-1]
+
+peek = None
+
+
+def Add_Preamble(Data):
+    Data = Con_sine+preamble+list(Data)
+    return  Data
+
+
+def Remove_Preamble(Sample):
+    global peek
+    Samples = []
+    for k in Sample:
+        Samples.append(-1 if k < 0 else 1)
+
+    corr = correlate(np.array(Samples), np.array(preamble), mode='valid')
+    if peek == None:
+        peek = np.argmax(corr)
+    Data = Samples[peek+len(preamble)::]
+    return Data
 
 def rrc_filter(alpha, span, sps):
     N = span * sps
@@ -196,17 +216,7 @@ BW = Rb * (1.35)
 
 print('Occupaid Band width: ',BW* 8.4)
 
-
-Vi = 20
-
-ConSine = [1 if i%2 == 0 else -1 for i in range(10)]
-
-
 h = rrc_filter(0,6,3)
-
-X1 = np.array([1, -1, 1, -1, -1, -1, -1, -1, 1, -1, 1, -1, -1, -1, 1, -1, -1, 1, -1, -1, 1, 1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1, 1, 1, 1, 1, -1, -1, 1, 1, -1, -1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, -1, 1, -1, 1, 1, 1, -1, 1, -1, 1, 1, -1, 1, 1, -1, 1, -1, 1])
-preamble = X1*1.5
-
 
 # === FIR Low-pass Filter Design (Anti-Imaging) ===
 cutoff = Rs / 2.5  # 3.072 MHz cutoff
@@ -228,18 +238,19 @@ def Modulate (Data):
     global Test_S
     
     BS = Generate_BitStream (Data)
-    Scr_BS = Scrambler(BS)    
-    
+    Scr_BS = Scrambler(BS)
+       
     print('No of S/W bits in Slot: ', len(Scr_BS))
     
     Int_BS = Interleaver (Scr_BS, 3 , 768) # Assume LDPC included in Interleaver 
-    
+
+    PreAmb = Add_Preamble(Int_BS)
+
     Nb = len(Int_BS)
     print('No of actual bits in Slot: ', Nb)
     
     T = Nb / Rd
-    
-    
+
     N = int(Nb * sps / 2)  #No_of_Samples
     
     n = [i for i in range(N)]
@@ -251,7 +262,7 @@ def Modulate (Data):
     print(len(Int_BS))
     
     IQ = GrayMap(Int_BS)
-    _I,_Q = IQ[0] , IQ[1]
+    _I,_Q = Add_Preamble(IQ[0]) , Add_Preamble(IQ[1])
     
 
     plt.cla()
@@ -263,13 +274,12 @@ def Modulate (Data):
 
     input()
 
-    _I = list(preamble)+_I
-    _Q = list(preamble)+_Q
+
 
     #upsampling
     I = [0 for i in range(len(_I)*3)]
     Q = [0 for i in range(len(_Q)*3)]
-    PreD =  [0 for i in range(len(preamble)*3)]
+  
     i=0
     s = 1
 
@@ -279,9 +289,6 @@ def Modulate (Data):
       i+=1
     i=0
  
-    for j in range(0,len(PreD),3):
-        PreD[j+s] = preamble[i]
-        i+=1
     del(i)
 
     I = np.array(I)
@@ -302,12 +309,6 @@ def Modulate (Data):
     up_I = np.convolve(I, h, mode='same')
     up_Q = np.convolve(Q, h, mode='same')
 
-    PreD = list(np.convolve(np.array(PreD), h, mode='same'))
-    Peek = max(PreD)
-
-    StPeek = PreD.index(Peek)
-    print(Peek ,'@', StPeek)
-    print(len(PreD) - StPeek)
 
     plt.cla()
     plt.plot(up_I,label = 'I data')
@@ -347,7 +348,8 @@ def Modulate (Data):
     DAC_I = lfilter(lpf, 1.0, ip_I)
     DAC_Q = lfilter(lpf, 1.0, ip_Q)
 
-    
+    Test_S = [DAC_I, DAC_Q]
+
 
     plt.cla()
     
@@ -384,6 +386,16 @@ def Modulate (Data):
     Fc = 100e6
 
     #Fc = int(input('Enter Frequency(MHz): '))*1e6
+    plt.cla()
+    
+    plt.plot(DAC_upI,label = 'I data')
+    #plt.plot(DAC_Q,label = 'Q data')
+    plt.legend()
+    plt.title('Interpolation and Low-Pass Filter in DAC')
+    plt.grid()
+    plt.show(block = False)
+
+    input()
 
     Sig_I = DAC_upI * np.cos(2 * np.pi * Fc * tfc)
     Sig_Q = DAC_upQ * np.sin(2 * np.pi * Fc * tfc)
@@ -406,7 +418,7 @@ def Modulate (Data):
     Sig_Q = Sig_Q * (2**DAC_GAIN)
 
     DAC_OUT = Sig_I - Sig_Q
-    Test_S = DAC_OUT
+    
     plt.cla()
     plt.plot(DAC_OUT,label = 'DAC data')
     plt.legend()
@@ -432,7 +444,6 @@ def Demodulate (ADC_IN):
   
     #Fc = int(input('Enter Frequency(MHz): '))*1e6
 
-    ADC_IN = Test_S
 
     Sig_I = ADC_IN * np.cos(2 * np.pi * Fc * tfc)
     Sig_Q = ADC_IN * np.sin(2 * np.pi * Fc * tfc)
@@ -468,6 +479,8 @@ def Demodulate (ADC_IN):
     plt.show(block = False)
     input()
     plt.savefig('ADC_OUT')
+
+    ADC_dn_I , ADC_dn_I = Test_S[0], Test_S[1]
 
 
     dc_I = upfirdn([1],ADC_dn_I,down = 30)
@@ -510,16 +523,22 @@ def Demodulate (ADC_IN):
         dn_I.append( np.sum(rrc_I[i+1:i+2]))
         dn_Q.append( np.sum(rrc_Q[i+1:i+2]))
 
-    dn_I = dn_I[len(preamble):]
-    dn_Q = dn_Q[len(preamble):]
-    
-    
 
-    dn_DATA = (np.array(dn_I)) + (1j * np.array(dn_Q))
+
+    plt.cla()
+    plt.plot(dn_I,label = 'I')
+    plt.plot(dn_Q,label = 'Q')
+    plt.legend()
+    plt.title('Before removing PreAmble')
+    plt.grid()
+    plt.show(block = False)
+    input()
+
+    dn_DATA = (np.array(dn_I)) + (1j * np.array(dn_Q[:len(dn_I)]))
 
     # plt.close()
     # plt.figure(figsize=(6, 6))
-    # plt.scatter(dn_DATA.real[:20], dn_DATA.imag[:20], s=2, color='blue', alpha=0.6)
+    # plt.scatter(dn_DATA.real, dn_DATA.imag, s=2, color='blue', alpha=0.6)
     # plt.axhline(0, color='black', lw=0.5)
     # plt.axvline(0, color='black', lw=0.5)
     # plt.grid(True, linestyle='--', alpha=0.5)
@@ -531,6 +550,25 @@ def Demodulate (ADC_IN):
     # plt.ylim([-1.5, 1.5])
     # plt.show()
 
+    print(len(preamble)+len(Con_sine))
+
+    print('Before: ',len(dn_I),len(dn_Q))
+    dn_I = Remove_Preamble(dn_I)
+    dn_Q = Remove_Preamble (dn_Q)
+    print('After: ',len(dn_I),len(dn_Q))
+
+    plt.cla()
+    plt.plot(dn_I,label = 'I')
+    plt.plot(dn_Q,label = 'Q')
+    plt.legend()
+    plt.title('Removed PreAmble')
+    plt.grid()
+    plt.show(block = False)
+    input()
+
+
+    dn_DATA = (np.array(dn_I)) + (1j * np.array(dn_Q))
+
     
     dn_DATA = list(dn_DATA)
 
@@ -538,6 +576,7 @@ def Demodulate (ADC_IN):
 
 
     print(len(DATA))
+
 
     Int_BS = Interleaver (DATA, 768,3)
 

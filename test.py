@@ -1,15 +1,29 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import get_window
+from scipy.signal import get_window, correlate
 
-N = 82
-X1 = list(np.array([i for i in range(40)])/42)
-X2 = list(np.array([i for i in range(39,-1,-1)])/42)
-Y1 = list(np.array([i for i in range(40)])*-1/42)
-Y2 = list(np.array([i for i in range(39,-1,-1)])*-1/42)
-preamble = [0,0]+ X1+X2 + Y1 + Y2 + [0,0]
+preamble = [1,1,-1,1,1,-1,1,1,-1,1,-1,-1,1,1,-1,1,1]
+Con_sine = [-1,1,-1,1,-1,1,-1,1,-1,1,-1,1,-1]
 
-print(len(preamble))
+def Add_Preamble(Data):
+    Data = Con_sine+preamble+list(Data)
+    return  Data
 
-plt.plot(preamble)
-plt.show()
+
+def Remove_Preamble(Sample):
+    Samples = []
+    for k in Sample:
+        Samples.append(-1 if k < 0 else 1)
+
+    corr = correlate(np.array(Samples), np.array(preamble), mode='valid')
+    peek = np.argmax(corr)
+    Data = Samples[peek+len(preamble)::]
+    return Data
+
+DATA = [1,-1,1,-1,1,1,1,1]
+print(DATA)
+pre = Add_Preamble(DATA)
+rem = Remove_Preamble(pre)
+
+print(pre)
+print(rem)
