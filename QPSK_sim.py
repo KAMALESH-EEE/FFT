@@ -472,7 +472,8 @@ def Demodulate (ADC_IN):
     print(max(ADC_dn_I))
 
     plt.cla()
-    plt.plot(ADC_dn_I,label = 'ADC data')
+    plt.plot(ADC_dn_I,label = 'I data ADC data')
+    plt.plot(ADC_dn_Q,label = 'Q data ADC data')
     plt.legend()
     plt.title('Final ADC Output')
     plt.grid()
