@@ -53,11 +53,10 @@ print('Ethernet Data',ETH_DATA)
 
 CS = Find_CheckSum(ETH_DATA)
 
+print(CS)
 
+SLOT_DATA ='::'+ETH_DATA + f'::{CS}::'
 
-SLOT_DATA =ETH_DATA + f'::{CS}'
-
-print(SLOT_DATA)
 
 KEY = 0
     
@@ -334,8 +333,7 @@ def Modulate (Data):
     up_I =  np.convolve(h, I, mode = 'same')
     up_Q =  np.convolve(h, Q, mode = 'same')
 
-    Test_S = [up_I,up_Q]
-
+    
     plt.cla()
     plt.plot(up_I,label = 'I data')
     plt.plot(up_Q,label = 'Q data')
@@ -346,6 +344,11 @@ def Modulate (Data):
     plt.show(block = False)
 
     input()
+
+
+    plot_eye(up_I, sps, num_traces=len(up_I))
+    plot_eye(up_Q, sps, num_traces=len(up_Q))
+
 
 
 
@@ -388,7 +391,7 @@ def Modulate (Data):
 
     input()
     plt.savefig('DAC_IN')
-    plot_eye(DAC_I,sps*30,num_traces=1000)
+
 
     # Modulation
 
@@ -548,8 +551,6 @@ def Demodulate (ADC_IN):
     plot_eye(rrc_Q, sps, num_traces=len(rrc_Q))
 
 
-
-
     dn_I = []
     dn_Q = []
 
@@ -616,7 +617,7 @@ def Demodulate (ADC_IN):
 
     Scr_BS = Scrambler(Int_BS)
     BS = Data_BitStream (Scr_BS)
-    print(BS)
+    return BS
 
 ADC_IN =[]
 
@@ -626,14 +627,27 @@ for i in FIFO:
 
     Noise = np.random.randint(0,10,size= (len(TX)))
     Noise = Noise * (TX.max() / 100)
-    # TX = TX + Noise
-    # plt.cla()
-    # plt.plot(TX,label = 'TX')
-    # plt.legend()
-    # plt.title('TX + Noise')
-    # plt.grid()
-    # plt.show(block = False)
-    # input()
+    TX = TX + Noise
+    plt.cla()
+    plt.plot(TX,label = 'TX')
+    plt.legend()
+    plt.title('TX + Noise')
+    plt.grid()
+    plt.show(block = False)
+    input()
 
 
-    Demodulate(TX)
+    RX = Demodulate(TX).split('::')
+    RX_SRC, RX_USER_DATA, RX_DES, RX_CS = RX[1],RX[2],RX[3],RX[4]
+    RX_ETH_DATA = SRC+'::'+USER_DATA+'::'+DES
+    CS = Find_CheckSum(RX_ETH_DATA)
+    print(RX)
+
+    if (CS == int(RX_CS)):
+        print('Recived Data Checksum mached !')
+        print(f'SRC:{RX_SRC}')
+        print(f'DES:{RX_DES}')
+        print(f'User Data: {RX_USER_DATA}')
+
+    else :
+        print('Checksum Mismatch!!!')
