@@ -1,51 +1,112 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.signal import upfirdn, correlate
+
+# RRC filter design
+def rrc_filter(beta, sps, span):
+    N = span * sps
+    t = np.arange(-N/2, N/2 + 1) / sps
+    eps = 1e-8
+    h = np.zeros_like(t)
+    for i in range(len(t)):
+        if abs(t[i]) < eps:
+            h[i] = 1.0 - beta + 4 * beta / np.pi
+        elif abs(abs(t[i]) - 1/(4*beta)) < eps:
+            h[i] = (beta / np.sqrt(2)) * (
+                (1 + 2/np.pi) * np.sin(np.pi/(4*beta)) +
+                (1 - 2/np.pi) * np.cos(np.pi/(4*beta))
+            )
+        else:
+            h[i] = (np.sin(np.pi * t[i] * (1 - beta)) +
+                    4 * beta * t[i] * np.cos(np.pi * t[i] * (1 + beta))) / \
+                   (np.pi * t[i] * (1 - (4 * beta * t[i])**2))
+    return h
 
 # Parameters
-N = 1000  # Number of symbols
-sps = 8   # Samples per symbol
-fc = 2e3  # Carrier frequency
-fs = 16e3 # Sampling rate
-t = np.arange(0, N*sps)/fs
-
-# Bit generation
-bits = np.random.randint(0, 2, N*2)
-symbols = bits.reshape(-1, 2)
+sps = 3
+beta = 0.35
+span = 6
+fc = 0.1  # Normalized carrier frequency (relative to Fs)
+num_data = 500
+rolloff = beta
 
 # QPSK Mapping
-mapping = {
-    (0,0): (1, 1),
-    (0,1): (-1, 1),
-    (1,1): (-1, -1),
-    (1,0): (1, -1)
-}
-I, Q = zip(*[mapping[tuple(b)] for b in symbols])
-I = np.repeat(I, sps)
-Q = np.repeat(Q, sps)
+def bits_to_symbols(bits):
+    mapping = {
+        (0,0): 1+1j,
+        (0,1): -1+1j,
+        (1,1): -1-1j,
+        (1,0): 1-1j
+    }
+    bit_pairs = bits.reshape(-1, 2)
+    return np.array([mapping[tuple(b)] for b in bit_pairs])
 
-# IQ modulation
-carrier_I = np.cos(2*np.pi*fc*t)
-carrier_Q = np.sin(2*np.pi*fc*t)
-tx_signal = I * carrier_I - Q * carrier_Q
+# Generate preamble and data
+preamble_bits = np.tile([0, 0, 0, 1, 1, 1, 1, 0], 4)
+preamble = bits_to_symbols(preamble_bits)
+data_bits = np.random.randint(0, 2, num_data * 2)
+data = bits_to_symbols(data_bits)
+symbols = np.concatenate([preamble, data])
 
-# IQ demodulation (coherent)
-rx_I = tx_signal * carrier_I * 2
-rx_Q = -tx_signal * carrier_Q * 2
+# RRC filter
+rrc = rrc_filter(beta, sps, span)
 
-# Low-pass filter (simple moving average here)
-def lpf(signal, span=16):
-    return np.convolve(signal, np.ones(span)/span, mode='same')
+# Transmit signal
+tx = upfirdn(rrc, symbols, up=sps)
 
-I_baseband = lpf(rx_I)
-Q_baseband = lpf(rx_Q)
+# Time vector
+t = np.arange(len(tx))
 
-# Downsample (symbol decisions)
-I_sym = I_baseband[sps//2::sps]
-Q_sym = Q_baseband[sps//2::sps]
+# Carrier modulation
+carrier = np.exp(1j * 2 * np.pi * fc * t)
+modulated = tx * carrier
 
+# Add sine tone interference (optional)
+sine = 0.5 * np.exp(1j * 2 * np.pi * 0.02 * t)
+tx_signal = modulated + sine
+
+# Receiver: Mix down (demodulate)
+rx = tx_signal * np.exp(-1j * 2 * np.pi * fc * t)
+
+# Matched RRC filter
+rx_filtered = upfirdn(rrc, rx, up=1, down=1)
+
+# Symbol synchronization via preamble cross-correlation
+rx_energy = rx_filtered / np.max(np.abs(rx_filtered))
+preamble_upsampled = upfirdn(rrc, preamble, up=sps)
+correlation = correlate(rx_energy, preamble_upsampled, mode='valid')
+start_idx = np.argmax(np.abs(correlation))
+aligned = rx_filtered[start_idx:]
+
+# Downsample after alignment
+samples = aligned[sps*span//2::sps]
+
+# Phase correction using preamble
+rx_preamble = samples[:len(preamble)]
+angle_offset = np.angle(np.sum(rx_preamble * np.conj(preamble)))
+samples_corrected = samples * np.exp(-1j * angle_offset)
+
+# Data after preamble
+rx_data = samples_corrected[len(preamble)-1:]
+
+# Constellation Plot
 plt.figure()
-plt.scatter(I_sym, Q_sym)
-plt.title("QPSK Constellation After Demodulation")
+plt.scatter(np.real(rx_data), np.imag(rx_data), color='blue', alpha=0.6)
+plt.title("QPSK Constellation After Time & Phase Correction")
 plt.grid(True)
 plt.axis('equal')
 plt.show()
+
+# Eye Diagram (I-channel)
+def plot_eye(signal, sps, num_traces=100):
+    trace_len = 2 * sps
+    for i in range(num_traces):
+        start = i * trace_len
+        if start + trace_len < len(signal):
+            plt.plot(np.real(signal[start:start+trace_len]), color='blue', alpha=0.3)
+    plt.title("Eye Diagram (I-component)")
+    plt.xlabel("Sample")
+    plt.grid(True)
+    plt.show()
+
+plot_eye(np.real(aligned), sps)

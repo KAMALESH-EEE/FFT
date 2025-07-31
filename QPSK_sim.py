@@ -66,6 +66,21 @@ KEY = 0
 
 FIFO = [SLOT_DATA]
 
+def plot_eye(signal, sps, num_traces=2):
+    plt.cla()
+    trace_len = sps *2
+    for i in range(num_traces):
+        start = i * trace_len
+        if start + trace_len < len(signal):
+            plt.plot(signal[start:start+trace_len], color='blue', alpha=0.35)
+    plt.title("Eye Diagram (I-component)")
+    plt.xlabel("Sample")
+    plt.ylabel("Amplitude")
+    plt.grid(True)
+    plt.show(block = False)
+
+    input()
+
 
 
 
@@ -168,7 +183,8 @@ def Grayde_Map(Sample):
 
 
 preamble = [1,1,-1,1,1,-1,1,1,-1,1,-1,-1,1,1,-1,1,1]
-Con_sine = [-1,1,-1,1,-1,1,-1,1,-1,1,-1,1,-1]
+
+Con_sine = [-1,1,-1,1,-1,1,-1,1,-1,1,-1,1,-1,1,-1]
 
 peek = None
 
@@ -179,13 +195,20 @@ def Add_Preamble(Data):
 
 
 def Remove_Preamble(Sample):
-    global peek
+    global peek,plt
     Samples = []
     for k in Sample:
         Samples.append(-1 if k < 0 else 1)
 
     corr = correlate(np.array(Samples), np.array(preamble), mode='valid')
     if peek == None:
+        plt.cla()
+        plt.plot(corr,label = 'Correlation')
+        plt.legend()
+        plt.title('Correlation')
+        plt.grid()
+        plt.show(block = False)
+        input()
         peek = np.argmax(corr)
     Data = Samples[peek+len(preamble)::]
     return Data
@@ -286,8 +309,8 @@ def Modulate (Data):
     s = 1
 
     for j in range(0,len(I),3):
-      I[j+s] = _I[i]
-      Q[j+s] = _Q[i]
+      I[j], I[j+1], I[j+2] = _I[i], _I[i], _I[i]
+      Q[j], Q[j+1],Q[j+2] = _Q[i], _Q[i], _Q[i]
       i+=1
     i=0
  
@@ -308,9 +331,10 @@ def Modulate (Data):
 
 
 
-    up_I = np.convolve(I, h, mode='same')
-    up_Q = np.convolve(Q, h, mode='same')
+    up_I =  np.convolve(h, I, mode = 'same')
+    up_Q =  np.convolve(h, Q, mode = 'same')
 
+    Test_S = [up_I,up_Q]
 
     plt.cla()
     plt.plot(up_I,label = 'I data')
@@ -350,7 +374,7 @@ def Modulate (Data):
     DAC_I = lfilter(lpf, 1.0, ip_I)
     DAC_Q = lfilter(lpf, 1.0, ip_Q)
 
-    Test_S = [DAC_I, DAC_Q]
+    
 
 
     plt.cla()
@@ -364,7 +388,7 @@ def Modulate (Data):
 
     input()
     plt.savefig('DAC_IN')
-
+    plot_eye(DAC_I,sps*30,num_traces=1000)
 
     # Modulation
 
@@ -458,7 +482,8 @@ def Demodulate (ADC_IN):
 
     
     plt.cla()
-    plt.plot(Sig_I,label = 'ADC data')
+    plt.plot(Sig_I,label = 'ADC I data')
+    plt.plot(Sig_Q,label = 'ADC Q data')
     plt.legend()
     plt.title('ADC IQ sepration')
     plt.grid()
@@ -478,8 +503,6 @@ def Demodulate (ADC_IN):
     ADC_dn_Q = lfilter(lpf, 1.0, ADC_dn_Q)
 
 
-    print(max(ADC_dn_I))
-
     plt.cla()
     plt.plot(ADC_dn_I,label = 'I data ADC data')
     plt.plot(ADC_dn_Q,label = 'Q data ADC data')
@@ -490,7 +513,6 @@ def Demodulate (ADC_IN):
     input()
     plt.savefig('ADC_OUT')
 
-    ADC_dn_I , ADC_dn_I = Test_S[0], Test_S[1]
 
 
     dc_I = upfirdn([1],ADC_dn_I,down = 30)
@@ -506,22 +528,24 @@ def Demodulate (ADC_IN):
 
 
 
+  #  rrc_I,rrc_Q = Test_S[0], Test_S[1]
 
 
+    rrc_I = np.convolve(h, dc_I, mode = 'same')
+    rrc_Q = np.convolve(h, dc_Q, mode = 'same')
 
-    rrc_I = np.convolve(dc_I,h, mode='same')
-    rrc_Q = np.convolve(dc_Q,h, mode='same')
-
-    rrc_I = dc_I
-    rrc_Q = dc_Q
 
     plt.cla()
     plt.plot(rrc_I,label = 'I')
+    plt.plot(rrc_Q,label = 'Q')
     plt.legend()
     plt.title('RX RRC Out')
     plt.grid()
     plt.show(block = False)
     input()
+
+    plot_eye(rrc_I, sps, num_traces=len(rrc_I))
+    plot_eye(rrc_Q, sps, num_traces=len(rrc_Q))
 
 
 
@@ -544,21 +568,21 @@ def Demodulate (ADC_IN):
     plt.show(block = False)
     input()
 
-    dn_DATA = (np.array(dn_I)) + (1j * np.array(dn_Q[:len(dn_I)]))
+    dn_DATA = (np.array(dn_I)) + (1j * np.array(dn_Q))
 
-    # plt.close()
-    # plt.figure(figsize=(6, 6))
-    # plt.scatter(dn_DATA.real, dn_DATA.imag, s=2, color='blue', alpha=0.6)
-    # plt.axhline(0, color='black', lw=0.5)
-    # plt.axvline(0, color='black', lw=0.5)
-    # plt.grid(True, linestyle='--', alpha=0.5)
-    # plt.title('Constellation Diagram')
-    # plt.xlabel("In-phase (I)")
-    # plt.ylabel("Quadrature (Q)")
-    # plt.axis('equal')
-    # plt.xlim([-1.5, 1.5])
-    # plt.ylim([-1.5, 1.5])
-    # plt.show()
+    plt.close()
+    plt.figure(figsize=(6, 6))
+    plt.scatter(dn_DATA.real, dn_DATA.imag, s=2, color='blue', alpha=0.6)
+    plt.axhline(0, color='black', lw=0.5)
+    plt.axvline(0, color='black', lw=0.5)
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.title('Constellation Diagram')
+    plt.xlabel("In-phase (I)")
+    plt.ylabel("Quadrature (Q)")
+    plt.axis('equal')
+    plt.xlim([-1.5, 1.5])
+    plt.ylim([-1.5, 1.5])
+    plt.show()
 
     print(len(preamble)+len(Con_sine))
 
@@ -568,8 +592,8 @@ def Demodulate (ADC_IN):
     print('After: ',len(dn_I),len(dn_Q))
 
     plt.cla()
-    plt.plot(dn_I,label = 'I')
-    plt.plot(dn_Q,label = 'Q')
+    plt.stem(dn_I,label = 'I')
+    # plt.plot(dn_Q,label = 'Q')
     plt.legend()
     plt.title('Removed PreAmble')
     plt.grid()
@@ -602,14 +626,14 @@ for i in FIFO:
 
     Noise = np.random.randint(0,10,size= (len(TX)))
     Noise = Noise * (TX.max() / 100)
-    TX = TX + Noise
-    plt.cla()
-    plt.plot(TX,label = 'TX')
-    plt.legend()
-    plt.title('TX + Noise')
-    plt.grid()
-    plt.show(block = False)
-    input()
+    # TX = TX + Noise
+    # plt.cla()
+    # plt.plot(TX,label = 'TX')
+    # plt.legend()
+    # plt.title('TX + Noise')
+    # plt.grid()
+    # plt.show(block = False)
+    # input()
 
 
     Demodulate(TX)
