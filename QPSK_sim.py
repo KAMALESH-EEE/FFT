@@ -199,6 +199,8 @@ def rrc_filter(alpha, span, sps):
     h = numerator / denominator
     h /= np.sqrt(np.sum(h**2))  # Normalize energy
     return h
+
+
     
 
 Test_S = None
@@ -396,11 +398,12 @@ def Modulate (Data):
     plt.show(block = False)
 
     input()
+    carrier_I = np.cos(2*np.pi* Fc * tfc)
+    carrier_Q = np.sin(2*np.pi* Fc * tfc)
 
-    Sig_I = DAC_upI * np.cos(2 * np.pi * Fc * tfc)
-    Sig_Q = DAC_upQ * np.sin(2 * np.pi * Fc * tfc)
-
-    
+    Sig_I = DAC_upI * carrier_I 
+    Sig_Q = DAC_upQ * carrier_Q
+  
 
     plt.cla()
     plt.plot(Sig_I,label = 'I data')
@@ -414,10 +417,10 @@ def Modulate (Data):
     input()
 
     DAC_GAIN = 0
-    Sig_I = Sig_I * (2**DAC_GAIN)
-    Sig_Q = Sig_Q * (2**DAC_GAIN)
 
     DAC_OUT = Sig_I - Sig_Q
+
+    DAC_OUT = DAC_OUT* (2** DAC_GAIN)
     
     plt.cla()
     plt.plot(DAC_OUT,label = 'DAC data')
@@ -445,8 +448,14 @@ def Demodulate (ADC_IN):
     #Fc = int(input('Enter Frequency(MHz): '))*1e6
 
 
-    Sig_I = ADC_IN * np.cos(2 * np.pi * Fc * tfc)
-    Sig_Q = ADC_IN * np.sin(2 * np.pi * Fc * tfc)
+    carrier_I = np.cos(2*np.pi* Fc * tfc)
+    carrier_Q = np.sin(2*np.pi* Fc * tfc)
+
+    Sig_I = ADC_IN * carrier_I * 2
+    Sig_Q = -ADC_IN * carrier_Q * 2
+
+
+
     
     plt.cla()
     plt.plot(Sig_I,label = 'ADC data')
