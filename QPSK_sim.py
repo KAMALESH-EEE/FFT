@@ -625,8 +625,11 @@ ADC_IN =[]
 for i in FIFO:
     TX = Modulate(i)
 
-    Noise = np.random.randint(0,10,size= (len(TX)))
-    Noise = Noise * (TX.max() / 100)
+    Noise = np.random.randint(0,10,size= (len(TX))) / 10
+    Noise = Noise * (max(TX)/10)
+    print('Signal power',max(TX))
+    print('Noise power',max(Noise) )
+    print('SNR:',max(TX)/max(Noise))
     TX = TX + Noise
     plt.cla()
     plt.plot(TX,label = 'TX')
@@ -636,18 +639,22 @@ for i in FIFO:
     plt.show(block = False)
     input()
 
+    try:
+            
 
-    RX = Demodulate(TX).split('::')
-    RX_SRC, RX_USER_DATA, RX_DES, RX_CS = RX[1],RX[2],RX[3],RX[4]
-    RX_ETH_DATA = SRC+'::'+USER_DATA+'::'+DES
-    CS = Find_CheckSum(RX_ETH_DATA)
-    print(RX)
+        RX = Demodulate(TX).split('::')
+        RX_SRC, RX_USER_DATA, RX_DES, RX_CS = RX[1],RX[2],RX[3],RX[4]
+        RX_ETH_DATA = SRC+'::'+USER_DATA+'::'+DES
+        CS = Find_CheckSum(RX_ETH_DATA)
+        #print(RX)
 
-    if (CS == int(RX_CS)):
-        print('Recived Data Checksum mached !')
-        print(f'SRC:{RX_SRC}')
-        print(f'DES:{RX_DES}')
-        print(f'User Data: {RX_USER_DATA}')
+        if (CS == int(RX_CS)):
+            print('Recived Data Checksum mached !')
+            print(f'SRC:{RX_SRC}')
+            print(f'DES:{RX_DES}')
+            print(f'User Data: {RX_USER_DATA}')
 
-    else :
-        print('Checksum Mismatch!!!')
+        else :
+            print('Checksum Mismatch!!!')
+    except :
+        print(RX)
