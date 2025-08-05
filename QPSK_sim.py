@@ -412,19 +412,19 @@ def Modulate (Data):
 
     tfc = np.arange(len(DAC_upI)) / DAC_Rd
 
-    Fc = 100e6
+    #Fc = 100e6
 
-    #Fc = int(input('Enter Frequency(MHz): '))*1e6
-    plt.cla()
+    Fc = int(input('Enter Frequency(MHz): '))*1e6
+    # plt.cla()
     
-    plt.plot(DAC_upI,label = 'I data')
-    #plt.plot(DAC_Q,label = 'Q data')
-    plt.legend()
-    plt.title('Interpolation and Low-Pass Filter in DAC')
-    plt.grid()
-    plt.show(block = False)
+    # plt.plot(DAC_upI,label = 'I data')
+    # plt.plot(DAC_Q,label = 'Q data')
+    # plt.legend()
+    # plt.title('Interpolation and Low-Pass Filter in DAC')
+    # plt.grid()
+    # plt.show(block = False)
 
-    input()
+    # input()
     carrier_I = np.cos(2*np.pi* Fc * tfc)
     carrier_Q = np.sin(2*np.pi* Fc * tfc)
 
@@ -436,7 +436,7 @@ def Modulate (Data):
     plt.plot(Sig_I,label = 'I data')
     plt.plot(Sig_Q,label = 'Q data')
     plt.legend()
-    plt.title('Interpolation in DAC')
+    plt.title('Digital Up Convertion in DAC')
     plt.grid()
 
     plt.show(block = False)
@@ -470,9 +470,9 @@ def Demodulate (ADC_IN):
     RX_Gain = 7
     ADC_IN = ADC_IN * (2**RX_Gain)
 
-    Fc = 100000000
+    #Fc = 100000000
   
-    #Fc = int(input('Enter Frequency(MHz): '))*1e6
+    Fc = int(input('Enter Frequency(MHz): '))*1e6
 
 
     carrier_I = np.cos(2*np.pi* Fc * tfc)
@@ -510,7 +510,7 @@ def Demodulate (ADC_IN):
     plt.plot(ADC_dn_I,label = 'I data ADC data')
     plt.plot(ADC_dn_Q,label = 'Q data ADC data')
     plt.legend()
-    plt.title('Final ADC Output')
+    plt.title('Digital Down Conversion ADC')
     plt.grid()
     plt.show(block = False)
     input()
@@ -573,7 +573,7 @@ def Demodulate (ADC_IN):
 
     plt.close()
     plt.figure(figsize=(6, 6))
-    plt.scatter(dn_DATA.real, dn_DATA.imag, s=2, color='blue', alpha=0.6)
+    plt.scatter(dn_DATA[50::].real, dn_DATA[50::].imag, s=2, color='blue', alpha=0.6)
     plt.axhline(0, color='black', lw=0.5)
     plt.axvline(0, color='black', lw=0.5)
     plt.grid(True, linestyle='--', alpha=0.5)
