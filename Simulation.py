@@ -1,32 +1,36 @@
-from PySpice.Spice.Netlist import Circuit, SubCircuitFactory
-
+import PySpice.Logging.Logging as Logging
+from PySpice.Spice.Netlist import Circuit, SubCircuit
 from PySpice.Unit import *
-import numpy as np
-from matplotlib import pyplot as plt
 
+logger = Logging.setup_logging()
 
-class VoltageDivider (SubCircuitFactory):
-    __name__ = 'VoltageDivider'
-    __node__ = ('IN1','IN2','OUT')
+class VoltageDivider(SubCircuit):
+    __name__ = 'divider'
+    __nodes__ = ('input', 'output', 'gnd')
 
-    def __init__(self,R1,R2):
-        #super().__init__()
+    def __init__(self, R1_value, R2_value):
+        SubCircuit.__init__(self,self.__name__,*self.__nodes__)
+        self.R(1, 'input', 'output', R1_value)
+        self.R(2, 'output', 'gnd', R2_value)
 
-        self.R(1,'IN1','OUT',R1)
-        self.R(2,'OUT','IN2',R2)
+# Main circuit
+circuit = Circuit('Main Circuit')
 
+# Add subcircuits
+circuit.subcircuit(VoltageDivider(1@u_kΩ, 1@u_kΩ))
+circuit.subcircuit(VoltageDivider(10@u_kΩ, 1@u_kΩ))
 
+# Voltage source
+circuit.V(1, 'vin1', circuit.gnd, 5@u_V)
+circuit.V(2, 'vin2', circuit.gnd, 5@u_V)
 
-circuit = Circuit('System')
-R1 = 10@u_Ohm
-R2 = 10@u_Ohm
+# Instantiate subcircuits
+circuit.X('1', 'divider', 'vin1', 'out1', circuit.gnd)
+circuit.X('2', 'divider', 'vin2', 'out2', circuit.gnd)
 
-circuit.subcircuit(VoltageDivider (R1,R2))
-
-circuit.X('D1','VoltageDivider','Vin',circuit.gnd,'Vout')
-circuit.V(1,'Vin',circuit.gnd,10@u_V)
-
+# Run transient analysis
 simulator = circuit.simulator()
-analysis = simulator.operating_point()
+analysis = simulator.transient(step_time=1@u_ms, end_time=2@u_s)
 
-print(analysis['Vout'][0])
+print(float(analysis['out1'][-1]))
+print(float(analysis['out2'][-1]))
