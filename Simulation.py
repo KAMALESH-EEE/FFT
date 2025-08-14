@@ -1,36 +1,28 @@
 import PySpice.Logging.Logging as Logging
 from PySpice.Spice.Netlist import Circuit, SubCircuit
 from PySpice.Unit import *
+from matplotlib import pyplot as plt
 
 logger = Logging.setup_logging()
 
-class VoltageDivider(SubCircuit):
-    __name__ = 'divider'
-    __nodes__ = ('input', 'output', 'gnd')
+libPath = 'C:\\Users\\KAMALESH\\OneDrive\\Documents\\LTspice\\LIBS\\'
 
-    def __init__(self, R1_value, R2_value):
-        SubCircuit.__init__(self,self.__name__,*self.__nodes__)
-        self.R(1, 'input', 'output', R1_value)
-        self.R(2, 'output', 'gnd', R2_value)
+lib = 'txb0108.inc'
 
-# Main circuit
-circuit = Circuit('Main Circuit')
+circuit = Circuit('Buffer')
 
-# Add subcircuits
-circuit.subcircuit(VoltageDivider(1@u_kΩ, 1@u_kΩ))
-circuit.subcircuit(VoltageDivider(10@u_kΩ, 1@u_kΩ))
+circuit.include(libPath+lib)
 
-# Voltage source
-circuit.V(1, 'vin1', circuit.gnd, 5@u_V)
-circuit.V(2, 'vin2', circuit.gnd, 5@u_V)
 
-# Instantiate subcircuits
-circuit.X('1', 'divider', 'vin1', 'out1', circuit.gnd)
-circuit.X('2', 'divider', 'vin2', 'out2', circuit.gnd)
+circuit.V('3V3','3V3',circuit.gnd,3.3@u_V)
+circuit.V('5V','5V',circuit.gnd,5@u_V)
 
-# Run transient analysis
+circuit.PulseVoltageSource('Input','OP_in',circuit.gnd,initial_value = 0@u_V, pulsed_value = 2@u_V, pulse_width = 4@u_ms, period = 8 @u_ms)
+
+circuit.X('U1','TXB0108',)
+
 simulator = circuit.simulator()
-analysis = simulator.transient(step_time=1@u_ms, end_time=2@u_s)
+analysis = simulator.transient(step_time = 1@u_us, end_time = 500@u_ms)
 
-print(float(analysis['out1'][-1]))
-print(float(analysis['out2'][-1]))
+plt.plot(analysis['out'])
+plt.show()
