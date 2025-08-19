@@ -1,28 +1,41 @@
 import PySpice.Logging.Logging as Logging
 from PySpice.Spice.Netlist import Circuit, SubCircuit
 from PySpice.Unit import *
-from matplotlib import pyplot as plt
 
+# Setup logging for PySpice to show any warnings or info
 logger = Logging.setup_logging()
 
-libPath = 'C:\\Users\\KAMALESH\\OneDrive\\Documents\\LTspice\\LIBS\\'
+# Define a subcircuit class for a voltage divider
+class VoltageDivider(SubCircuit):
+    # Specify the external nodes (pins) of the subcircuit
+    __nodes__ = ('input', 'output')
 
-lib = 'txb0108.inc'
+    # The __init__ method is where you define the components inside the subcircuit
+    def __init__(self, name, R1_value, R2_value):
+        # Call the parent constructor, providing the name and nodes
+        SubCircuit.__init__(self, name, *self.__nodes__)
 
-circuit = Circuit('Buffer')
+        # Add the components of the subcircuit using PySpice's syntax
+        # The internal nodes are automatically handled by the library
+        self.R(1, 'input', 'output', R1_value)
+        self.R(2, 'output', self.gnd, R2_value)
 
-circuit.include(libPath+lib)
+# Define the main circuit where you will use your subcircuit
+circuit = Circuit('Main Circuit')
 
+# Instantiate the subcircuit multiple times with different parameters
+# This is where reusability comes into play
+circuit.subcircuit(VoltageDivider('divider_1', 1@u_kΩ, 1@u_kΩ))
+circuit.subcircuit(VoltageDivider('divider_2', 10@u_kΩ, 1@u_kΩ))
 
-circuit.V('3V3','3V3',circuit.gnd,3.3@u_V)
-circuit.V('5V','5V',circuit.gnd,5@u_V)
+# Use the subcircuit instances in the main circuit
+# The 'X' prefix indicates that you are instantiating a subcircuit
+# The first argument is the instance name, the next arguments are the nodes
+# connected to its pins, and the last is the name of the subcircuit.
+circuit.X('1', 'divider_1', 5@u_V, 'out1')  # Connects the first divider to a 5V source
+circuit.X('2', 'divider_2', 5@u_V, 'out2')  # Connects the second divider to the same source
 
-circuit.PulseVoltageSource('Input','OP_in',circuit.gnd,initial_value = 0@u_V, pulsed_value = 2@u_V, pulse_width = 4@u_ms, period = 8 @u_ms)
-
-circuit.X('U1','TXB0108',)
-
-simulator = circuit.simulator()
-analysis = simulator.transient(step_time = 1@u_us, end_time = 500@u_ms)
-
-plt.plot(analysis['out'])
-plt.show()
+# Print the generated netlist to see the result
+# The correct way to get the netlist is to print the circuit object directly.
+# The 'clean_netlist' method that caused the error is not a valid attribute.
+print(circuit)
