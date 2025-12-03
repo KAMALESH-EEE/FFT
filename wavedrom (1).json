@@ -1,0 +1,7 @@
+{signal: [
+  {name: '10MHz clk', wave: 'p........................'},  
+  {name: 'CS', wave: '10......|.........|....1x'},
+  {name: 'SCK', wave: 'x0.10101|010.10101|0101.x'},
+  {name: 'MOSI', wave: 'x.=.=.=.|=.=..=.=.|=.=.x.', data: ['31th bit', '30th bit', '29th bit', '16th bit','15th bit','14th bit','13th bit','1st bit','0th bit']},
+  {name: 'MISO', wave: 'x.=.=.=.|=.=..=.=.|=.=.x.', data:  ['31th bit', '30th bit', '29th bit', '16th bit','15th bit','14th bit','13th bit','1st bit','0th bit']}
+]}
