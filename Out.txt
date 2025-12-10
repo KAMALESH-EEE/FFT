@@ -1,0 +1,6 @@
+Hai
+This it is a file
+used to 
+check and
+Validate
+the Ether file handling !
