@@ -33,8 +33,8 @@ class FH:
     
 if __name__ == '__main__' :
     
-    TX = FH(False,'Dummy.txt')
-    RX = FH(True,'Out.txt')
+    TX = FH(False,'DAC_IN.png')
+    RX = FH(True,'Out.png')
     RX.RawData = TX.RawData[:]
     RX.CheckSum = TX.CheckSum
     print(RX.RX_write())
