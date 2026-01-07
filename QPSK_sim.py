@@ -39,8 +39,8 @@ def Find_CheckSum(Data):
     return cs
     
     
-USER_DATA = 'RADIO-RELAY_PRHP_HCRR_NG-SDR_MANPACK_SFF-SDR_UCR'
-
+#USER_DATA = 'RADIO-RELAY_PRHP_HCRR_NG-SDR_MANPACK_SFF-SDR_UCR'
+USER_DATA = 'Jana Nayagan = Bhagavanth Kesari'
 
 SRC = '10.5.15.25'
 DES = '10.5.15.20'
