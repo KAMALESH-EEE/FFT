@@ -5,14 +5,9 @@ import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt 
 import struct
-from RK import *
-
-
-# Changing Directory
-os.chdir("D:\DP_testing")
 
 #opening ADC Bin File
-with open("ADC_IQ_rx10.bin",'rb') as f:
+with open("C:/Users/KAMALESH/Downloads/ADC_IQ_rx10.bin",'rb') as f:
     raw = f.read()
 
 
@@ -21,7 +16,8 @@ Ns = len(raw)//4
 Data = struct.unpack(f"<{Ns}I",raw)
 
 Fs = Ns / 5
-
+print(Fs)
+print(Data[:4])
 #Converting into array
 IQ = np.array(Data)
 

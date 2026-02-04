@@ -4,6 +4,11 @@ import socket
 import struct
 
 
+a = b'\x01'
+print(a[0])
+
+
+input()
 class ETH_HANDLE:
 
     def __init__(self,ip,port,PR = 100, PS = 800):
