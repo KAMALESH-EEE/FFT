@@ -62,6 +62,9 @@ class FPGA:
     Blocks_per_Slot = 2
     Bytes_per_Slot = Bytes_per_Block * 2
 
+    G1 = [1,1,1]
+    G2 = [1,0,1]
+
 
     TX_FIFO = []
     RX_FIFO = []
@@ -106,8 +109,93 @@ class FPGA:
                 A.append((i>>t)&1)
 
         #print(A)
-        return A
+        return np.array(A)
     
+    
+    def conv_encoder(data):
+        shift = [0,0]
+        encoded = []
+
+        for bit in data:
+            inputs = [bit] + shift
+            out1 = np.sum(np.array(inputs)*FPGA.G1) % 2
+            out2 = np.sum(np.array(inputs)*FPGA.G2) % 2
+            encoded.extend([out1, out2])
+            shift = [bit] + shift[:-1]
+
+        # Add tail bits (force to zero state)
+        for _ in range(2):
+            bit = 0
+            inputs = [bit] + shift
+            out1 = np.sum(np.array(inputs)*FPGA.G1) % 2
+            out2 = np.sum(np.array(inputs)*FPGA.G2) % 2
+            encoded.extend([out1, out2])
+            shift = [bit] + shift[:-1]
+
+        return np.array(encoded)
+
+    def viterbi_decoder(received, threshold_factor=2.0):
+
+        n_states = 4
+        path_metrics = np.full(n_states, np.inf)
+        path_metrics[0] = 0
+        paths = [[] for _ in range(n_states)]
+
+        next_state = {
+            0: {0:0, 1:2},
+            1: {0:0, 1:2},
+            2: {0:1, 1:3},
+            3: {0:1, 1:3}
+        }
+
+        output_bits = {
+            0: {0:[0,0], 1:[1,1]},
+            1: {0:[1,1], 1:[0,0]},
+            2: {0:[1,0], 1:[0,1]},
+            3: {0:[0,1], 1:[1,0]}
+        }
+
+        for i in range(0, len(received), 2):
+            r = received[i:i+2]
+
+            new_metrics = np.full(n_states, np.inf)
+            new_paths = [[] for _ in range(n_states)]
+
+            for state in range(n_states):
+                if path_metrics[state] < np.inf:
+
+                    for bit in [0,1]:
+                        ns = next_state[state][bit]
+                        expected = output_bits[state][bit]
+
+                        metric = path_metrics[state] + np.sum(np.abs(r - expected))
+
+                        if metric < new_metrics[ns]:
+                            new_metrics[ns] = metric
+                            new_paths[ns] = paths[state] + [bit]
+
+            path_metrics = new_metrics
+            paths = new_paths
+
+        best_state = np.argmin(path_metrics)
+        best_metric = path_metrics[best_state]
+
+        decoded = np.array(paths[best_state])
+
+        # Remove tail bits
+        decoded = decoded[:-2]
+
+        # Threshold decision
+        avg_metric = best_metric / (len(received)/2)
+
+        if avg_metric > threshold_factor:
+            return decoded, False
+        else:
+            return decoded, True
+
+
+
+
     def Scrambler():
         pass
 
